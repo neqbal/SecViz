@@ -90,6 +90,9 @@ body {
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--panel-border);
   color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 /* Pseudocode Section */
@@ -106,6 +109,11 @@ body {
   line-height: 1.6;
   overflow-y: auto;
   flex: 1;
+}
+
+.line-wrapper {
+  display: flex;
+  flex-direction: column;
 }
 
 .code-line {
@@ -135,10 +143,57 @@ body {
   color: var(--accent);
 }
 
+.assembly-block {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.5rem 1.5rem 0.5rem 4rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  border-left: 4px solid transparent;
+}
+.assembly-line {
+  white-space: pre;
+}
+
 .keyword { color: #ff7b72; }
 .function { color: #d2a8ff; }
 .string { color: #a5d6ff; }
 .comment { color: #8b949e; font-style: italic; }
+.number { color: #79c0ff; }
+
+/* Console View */
+.console-section {
+  margin-top: 1rem;
+  background: #0a0a0a;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  height: 150px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.console-header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-family: monospace;
+  color: var(--text-muted);
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.console-body {
+  padding: 0.75rem 1rem;
+  font-family: 'Fira Code', monospace;
+  color: #a5d6ff;
+  flex: 1;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+.console-body span.garbage {
+  color: #ff7b72;
+}
 
 /* Stack Section */
 .stack-section {
@@ -197,6 +252,10 @@ body {
 .stack-block.filled {
   background: rgba(88, 166, 255, 0.2);
   border-color: rgba(88, 166, 255, 0.5);
+}
+.stack-block.main-frame {
+  background: rgba(163, 113, 247, 0.15);
+  border-color: rgba(163, 113, 247, 0.4);
 }
 
 .block-label { z-index: 1; }
@@ -285,6 +344,14 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+}
+
+.btn-small {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  flex: 0;
+  white-space: nowrap;
 }
 
 .btn-primary {
