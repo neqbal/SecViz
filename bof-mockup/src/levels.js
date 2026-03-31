@@ -6,6 +6,10 @@ export const LEVELS = [
         goal: 'CRASH',
         successTitle: 'Crash Successful!',
         successDesc: 'You successfully overflowed the buffer and corrupted the Return Address, causing the program to jump to invalid memory and crash. In the next level, we will learn how to weaponize this memory boundary issue.',
+        defensePatch: {
+            vulnText: "    read(1, buff, 100); // User inputs > 24 bytes to crash",
+            safeText: "    read(1, buff, 16); // Safely read only 16 bytes max!"
+        },
         startCodeLine: 6,
         code: [
             { text: "#include <stdio.h>", asm: [] },
@@ -39,6 +43,10 @@ export const LEVELS = [
         goal: 'LEAK',
         successTitle: 'Secret Leaked!',
         successDesc: 'Since read() does not append a null byte, providing exactly 16 bytes bridged `buff` directly into `secret_key`. printf kept reading memory until it hit the null byte at the end of the secret, leaking it to the console!',
+        defensePatch: {
+            vulnText: "    read(1, buff, 16); // Safe length, but no null-terminator appended!",
+            safeText: "    read(1, buff, 15); buff[15] = '\\0'; // Null-terminator secures the secret!"
+        },
         startCodeLine: 10,
         code: [
             { text: "#include <stdio.h>", asm: [] },

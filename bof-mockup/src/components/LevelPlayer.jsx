@@ -2,12 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import StackCanvas from './StackCanvas.jsx';
 
-export default function LevelPlayer({ level, onWin }) {
+export default function LevelPlayer({ level, onWin, onNextLevel }) {
     const [step, setStep] = useState(0);
     const [activeLineIndex, setActiveLineIndex] = useState(level.startCodeLine);
     const [stack, setStack] = useState(level.initialStack);
     const [userInput, setUserInput] = useState('');
     const [inputSubmitted, setInputSubmitted] = useState(false);
+
+    // Defender state
+    const [isPatched, setIsPatched] = useState(false);
+    const [showPatchWindow, setShowPatchWindow] = useState(false);
+    const [toast, setToast] = useState(null); // { msg, type }
 
     const initialEsp = level.initialStack.findIndex(s => s.label.includes("main Saved EBP")) !== -1
         ? level.initialStack.findIndex(s => s.label.includes("main Saved EBP"))
@@ -29,8 +34,29 @@ export default function LevelPlayer({ level, onWin }) {
         if (consoleRef.current) consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
     }, [consoleOut]);
 
+    const showToast = (msg, type = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 4000);
+    };
+
+    const triggerWin = (patched) => {
+        if (patched) {
+            showToast('🛡️ Defended! The patch successfully blocked the exploit.', 'success');
+        } else {
+            showToast('💥 Exploit succeeded! Swap the read syscall to defend.', 'danger');
+        }
+        onWin();
+    };
+
     const renderCodeLine = (line, idx) => {
-        let html = line.text;
+        let rawText = line.text;
+        const isVulnLine = level.defensePatch && (rawText.trim() === level.defensePatch.vulnText.trim() || rawText.trim() === level.defensePatch.safeText.trim());
+
+        if (isVulnLine) {
+            rawText = isPatched ? level.defensePatch.safeText : level.defensePatch.vulnText;
+        }
+
+        let html = rawText;
         html = html.replace(/#include|void|char|int|long|if/g, '<span class="keyword">$&</span>');
         html = html.replace(/vuln|main|read|printf|puts|system|__stack_chk_fail/g, '<span class="function">$&</span>');
         html = html.replace(/"([^"]*)"/g, '<span class="string">"$&"</span>').replace(/"<span class="string">"([^"]*)"<\/span>"/g, '<span class="string">"$1"</span>');
@@ -38,9 +64,34 @@ export default function LevelPlayer({ level, onWin }) {
 
         return (
             <div key={idx} className="line-wrapper">
-                <div className={`code-line ${idx === activeLineIndex ? 'active' : ''}`}>
+                <div className={`code-line ${idx === activeLineIndex ? 'active' : ''}`} style={{ position: 'relative' }}>
                     <span className="line-number">{idx + 1}</span>
                     <span className="line-content" dangerouslySetInnerHTML={{ __html: html }}></span>
+
+                    {level.defensePatch && isVulnLine && (
+                        <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }}>
+                            <button
+                                className="btn btn-secondary"
+                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', background: isPatched ? '#1f6feb' : '#238636', borderColor: isPatched ? '#388bfd' : '#2ea043' }}
+                                onClick={() => setShowPatchWindow(!showPatchWindow)}
+                            >
+                                {isPatched ? '🔓 Patched' : '🛡️ Fix'}
+                            </button>
+
+                            {showPatchWindow && (
+                                <div style={{ position: 'absolute', right: '0', top: '120%', background: '#161b22', border: '1px solid #30363d', padding: '1rem', borderRadius: '6px', width: 'max-content', boxShadow: '0 8px 16px rgba(0,0,0,0.5)' }}>
+                                    <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: '#8b949e' }}>Hot-Swap Syscall:</div>
+                                    <div
+                                        className="assembly-line highlight"
+                                        style={{ cursor: 'pointer', borderColor: isPatched ? '#30363d' : '#2ea043' }}
+                                        onClick={() => { setIsPatched(!isPatched); setShowPatchWindow(false); }}
+                                    >
+                                        {isPatched ? level.defensePatch.vulnText.trim() : level.defensePatch.safeText.trim()}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -102,6 +153,7 @@ export default function LevelPlayer({ level, onWin }) {
 
             case 2.5:
                 let buffIdx = level.code.findIndex(l => l.text.includes("char buff"));
+                if (buffIdx === -1) buffIdx = activeLineIndex + 1;
                 setActiveLineIndex(buffIdx);
                 setStatusTitle("vuln() Array Allocation");
 
@@ -131,9 +183,11 @@ export default function LevelPlayer({ level, onWin }) {
                     setStatusTitle("Executing puts()");
                     setStep(3.5);
                 } else {
-                    setActiveLineIndex(readIdx); // read
-                    if (level.id === '2a') {
+                    setActiveLineIndex(readIdx);
+                    if (level.id === '2a' && !isPatched) {
                         setStatusDesc("read() bounds-checks perfectly to 16 bytes, but doesn't append a null terminator. If you fill exactly 16 bytes, it will bleed into the adjacent secret!");
+                    } else if (level.id === '2a' && isPatched) {
+                        setStatusDesc("read() securely terminates the buffer. The secret is completely safe!");
                     }
                     setStatusTitle("read() Execution");
                     setStep(4);
@@ -143,8 +197,10 @@ export default function LevelPlayer({ level, onWin }) {
             case 3.5:
                 let readIdx2 = level.code.findIndex(l => l.text.includes("read(1, "));
                 setActiveLineIndex(readIdx2);
-                if (level.id === '2a') {
+                if (level.id === '2a' && !isPatched) {
                     setStatusDesc("read() bounds-checks perfectly to 16 bytes, but doesn't append a null terminator. If you fill exactly 16 bytes, it will bleed into the adjacent secret!");
+                } else if (level.id === '2a' && isPatched) {
+                    setStatusDesc("read() securely terminates the buffer. The secret is completely safe!");
                 }
                 setStatusTitle("read() Execution");
                 setStep(4);
@@ -155,12 +211,16 @@ export default function LevelPlayer({ level, onWin }) {
                 if (printfIdx !== -1) {
                     setActiveLineIndex(printfIdx);
                     setStatusTitle("Executing printf()");
-                    let outText = userInput.substring(0, level.id === '2a' ? 16 : 100);
+
+                    let maxLen = 100;
+                    if (level.id === '2a') maxLen = isPatched ? 15 : 16;
+
+                    let outText = userInput.substring(0, maxLen);
                     let leakGarbage = '';
 
-                    if (level.id === '1' && userInput.length >= 16) {
+                    if (level.id === '1' && userInput.length >= 16 && !isPatched) {
                         leakGarbage = '\\x40\\x11\\xe8\\x00';
-                    } else if (level.id === '2a' && userInput.length === 16) {
+                    } else if (level.id === '2a' && userInput.length >= 16 && !isPatched) {
                         leakGarbage = 'SUPER_SECRET_KEY';
                     }
                     setConsoleOut(prev => [...prev, { text: outText, isGarbage: false }, leakGarbage ? { text: leakGarbage, isGarbage: true } : null].filter(Boolean));
@@ -179,56 +239,26 @@ export default function LevelPlayer({ level, onWin }) {
 
                 setStatusTitle("vuln() Epilogue");
 
-                // Canary Check for Level 3A
-                if (level.goal === 'CANARY_ABORT') {
-                    let canaryChkIdx = level.code.findIndex(l => l.text.includes("fs_canary !="));
-                    if (canaryChkIdx !== -1) {
-                        setActiveLineIndex(canaryChkIdx);
-                        let canaryBlock = stack.find(s => s.label.includes("CANARY"));
-                        if (canaryBlock && canaryBlock.type === 'danger') {
-                            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                            setStatusType("danger");
-                            setStatusTitle("*** stack smashing detected ***: terminated");
-                            setStatusDesc("The Canary value was modified by your buffer overflow!");
-                            setActiveLineIndex(canaryChkIdx + 1); // __stack_chk_fail()
-                            setStep(100);
-                            setTimeout(() => onWin(), 3000);
-                            return;
-                        }
-                    }
-                }
-
                 let returnedSafely = true;
                 let retBlock = stack.find(s => s.label.includes("Return Addr") && !s.label.includes("main"));
 
-                if (userInput.length > 16 && retBlock && retBlock.type === 'danger') {
+                if (!isPatched && userInput.length > 16 && retBlock && retBlock.type === 'danger') {
                     returnedSafely = false;
                 }
 
                 if (!returnedSafely) {
-                    if (level.goal === 'HIJACK' && retBlock.value.includes("x42\\x11\\x40")) {
-                        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
-                        setStatusType("success");
-                        setStatusTitle("ROOT SHELL SPAWNED!");
-                        setStatusDesc("You redirected execution to win() perfectly! 0x401142 was popped into RIP.");
-                        setStep(100);
-                        setTimeout(() => onWin(), 3500);
-                    } else if (level.goal === 'PIE_FAIL' && retBlock.value.includes("x42\\x11\\x40")) {
-                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                        setStatusType("danger");
-                        setStatusTitle("Segmentation Fault!");
-                        setStatusDesc("You jumped to 0x401142, but win() is NOT located there anymore because PIE randomized the app's base address! Execution crashed.");
-                        setStep(100);
-                        setTimeout(() => onWin(), 3500);
-                    } else {
-                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                        setStatusType("danger");
-                        setStatusTitle("Segmentation Fault!");
-                        setStatusDesc("Execution crashed. The Return Address did not point to a valid function.");
-                        setStep(100);
-                        if (level.goal === 'CRASH') setTimeout(() => onWin(), 2000);
-                    }
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                    setStatusType("danger");
+                    setStatusTitle("Segmentation Fault!");
+                    setStatusDesc("Execution crashed. The Return Address did not point to a valid function.");
+                    setStep(100);
+                    if (level.goal === 'CRASH') setTimeout(() => triggerWin(isPatched), 2000);
                 } else {
+                    if (isPatched && userInput.length > 16 && level.goal === 'CRASH') {
+                        setStatusDesc("Defended! The boundaries prevented the payload from overflowing past buff[15].");
+                        setStatusType("success");
+                        setTimeout(() => triggerWin(true), 1000);
+                    }
                     setEspIndex(initialEsp - 1);
                     setEbpIndex(initialEbp);
                     setStep(7);
@@ -247,8 +277,14 @@ export default function LevelPlayer({ level, onWin }) {
                     setActiveLineIndex(endMainIdx);
                     setStatusTitle("Program Exited");
                     setStep(100);
-                    if (level.goal === 'LEAK' && userInput.length === 16) {
-                        setTimeout(() => onWin(), 1500);
+                    if (level.goal === 'LEAK') {
+                        if (!isPatched && userInput.length >= 16) {
+                            setTimeout(() => triggerWin(false), 1500);
+                        } else if (isPatched && userInput.length >= 16) {
+                            setStatusDesc("Defended! The null-terminator safely blocked the secret from leaking out through printf!");
+                            setStatusType("success");
+                            setTimeout(() => triggerWin(true), 1500);
+                        }
                     }
                 }
                 break;
@@ -259,11 +295,17 @@ export default function LevelPlayer({ level, onWin }) {
                 setStatusTitle("Program Exited");
                 setStep(100);
 
-                if (level.goal === 'LEAK' && userInput.length === 16) {
-                    setTimeout(() => onWin(), 1500);
-                } else if (level.goal === 'LEAK') {
-                    setStatusDesc("Program finished safely, but we didn't leak the entire secret. Try submitting exactly 16 bytes.");
-                    setStatusType("warn");
+                if (level.goal === 'LEAK') {
+                    if (!isPatched && userInput.length >= 16) {
+                        setTimeout(() => triggerWin(false), 1500);
+                    } else if (isPatched && userInput.length >= 16) {
+                        setStatusDesc("Defended! The null-terminator safely blocked the secret from leaking out through printf!");
+                        setStatusType("success");
+                        setTimeout(() => triggerWin(true), 1500);
+                    } else if (!isPatched) {
+                        setStatusDesc("Program finished safely, but we didn't leak the entire secret. Try submitting exactly 16 bytes.");
+                        setStatusType("warn");
+                    }
                 }
                 break;
         }
@@ -275,8 +317,16 @@ export default function LevelPlayer({ level, onWin }) {
         setInputSubmitted(true);
 
         let newStack = stack.map(s => ({ ...s }));
-        let remainingInput = userInput;
 
+        // Core Defender logic: securely process input boundaries
+        let processedInput = userInput;
+        if (isPatched) {
+            let maxLen = level.id === '2a' ? 15 : 16;
+            processedInput = processedInput.substring(0, maxLen);
+            if (level.id === '2a') processedInput += '\\0';
+        }
+
+        let remainingInput = processedInput;
         let bufferStartIndex = newStack.findIndex(s => s.label.startsWith("buff[0"));
         let currentIdx = bufferStartIndex;
         let hasOverflowedBuffer = false;
@@ -298,9 +348,8 @@ export default function LevelPlayer({ level, onWin }) {
             targetBlock.value = chunk.padEnd(chunk.length === 8 ? 8 : chunk.length + 1, '\\0');
             currentIdx--;
 
-            if (level.id === '2a' && currentIdx < bufferStartIndex - 1) {
-                break;
-            }
+            if (isPatched && currentIdx < bufferStartIndex - 1) break;
+            if (level.id === '2a' && currentIdx < bufferStartIndex - 1) break;
         }
 
         if (hasOverflowedBuffer) {
@@ -315,10 +364,9 @@ export default function LevelPlayer({ level, onWin }) {
         setStack(newStack);
         setStep(5);
 
-        // Auto advance if no printf step exists
         let printfIdx = level.code.findIndex(l => l.text.includes("printf"));
         if (printfIdx === -1) {
-            setTimeout(handleNextStep, 500); // give it half a sec then move to case 6
+            setTimeout(handleNextStep, 500);
         }
     };
 
@@ -338,8 +386,20 @@ export default function LevelPlayer({ level, onWin }) {
 
     const currentLineData = level.code[activeLineIndex];
 
+    const toastBg = toast?.type === 'danger' ? 'rgba(248,81,73,0.95)' : 'rgba(35,134,54,0.95)';
+    const toastBorder = toast?.type === 'danger' ? '#f85149' : '#2ea043';
+
     return (
         <>
+            {toast && (
+                <motion.div
+                    key={toast.msg}
+                    style={{ position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', background: toastBg, color: 'white', padding: '1rem 2rem', borderRadius: '8px', zIndex: 9999, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', border: `1px solid ${toastBorder}`, textAlign: 'center', minWidth: '400px' }}
+                    initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -50 }}
+                >
+                    {toast.msg}
+                </motion.div>
+            )}
             <main className="main-content">
                 <section className="panel code-section">
                     <div className="panel-header" style={{ marginBottom: '0.5rem' }}>
@@ -369,7 +429,7 @@ export default function LevelPlayer({ level, onWin }) {
 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem', height: '100%', minWidth: '400px' }}>
                     <section className="panel stack-section" style={{ padding: '0', display: 'flex', flex: 1 }}>
-                        <StackCanvas stack={stack} espIndex={espIndex} ebpIndex={ebpIndex} userInput={userInput} step={step} level={level} />
+                        <StackCanvas stack={stack} espIndex={espIndex} ebpIndex={ebpIndex} userInput={userInput} step={step} level={level} isPatched={isPatched} />
                     </section>
 
                     <section className="panel controls-section" style={{ flex: 'none' }}>
@@ -392,9 +452,10 @@ export default function LevelPlayer({ level, onWin }) {
                             )}
                         </div>
 
-                        <div className="button-group">
+                        <div className="button-group" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                             <button className="btn btn-secondary" onClick={resetSimulation}>Reset</button>
                             <button className="btn btn-primary" onClick={handleNextStep} disabled={step === 4 || step === 100}>Next Step</button>
+                            <button className="btn btn-success" onClick={onNextLevel} style={{ marginLeft: 'auto' }}>Next Stage →</button>
                         </div>
                     </section>
                 </div>

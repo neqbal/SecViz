@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { lerp } from '../utils/math.js';
 
-export default function StackCanvas({ stack, espIndex, ebpIndex, userInput, step, level }) {
+export default function StackCanvas({ stack, espIndex, ebpIndex, userInput, step, level, isPatched }) {
     const canvasRef = useRef(null);
     const animState = useRef({ fillHeight: 0, espY: 0, ebpY: 0, time: 0 });
 
@@ -72,24 +72,31 @@ export default function StackCanvas({ stack, espIndex, ebpIndex, userInput, step
                 ctx.fillText(val, startX + 15, y + blockHeight - 12);
             });
 
-            // Fluid Simulation
-            let bufferBottomIndex = stack.findIndex(s => s.label.startsWith("buff[0"));
-            if (bufferBottomIndex !== -1 && animState.current.fillHeight > 0.5) {
-                let visualBottomIndex = stack.length - 1 - bufferBottomIndex;
-                const bufferVisualBottomY = startY + visualBottomIndex * blockHeight + blockHeight;
-                const bufferVisualTopY = startY + (visualBottomIndex - 1) * blockHeight;
-                const totalBufferHeight = bufferVisualBottomY - bufferVisualTopY;
+            // Fluid Simulation — find ALL buff blocks and compute full extents
+            const allBuffBlocks = stack
+                .map((s, i) => ({ s, i }))
+                .filter(({ s }) => s.label.startsWith('buff['));
 
-                const fluidTopY = bufferVisualBottomY - animState.current.fillHeight;
+            if (allBuffBlocks.length > 0 && animState.current.fillHeight > 0.5) {
+                const visualIndices = allBuffBlocks.map(({ i }) => stack.length - 1 - i);
+                const minVisualIdx = Math.min(...visualIndices); // topmost buff cell on canvas
+                const maxVisualIdx = Math.max(...visualIndices); // bottommost buff cell on canvas
+
+                const bufferCanvasTopY = startY + minVisualIdx * blockHeight;
+                const bufferCanvasBottomY = startY + (maxVisualIdx + 1) * blockHeight;
+                const totalBufferHeight = bufferCanvasBottomY - bufferCanvasTopY;
+
+                const fluidTopY = bufferCanvasBottomY - animState.current.fillHeight;
                 const isOverflow = animState.current.fillHeight > totalBufferHeight;
 
                 ctx.save();
                 ctx.beginPath();
-                ctx.rect(startX, 0, blockWidth, rect.height);
+                // Clip strictly within the stack region — never spill above startY
+                ctx.rect(startX, startY, blockWidth, rect.height - startY);
                 ctx.clip();
 
-                const gradient = ctx.createLinearGradient(0, Math.max(0, fluidTopY), 0, bufferVisualBottomY);
-                if (isOverflow) {
+                const gradient = ctx.createLinearGradient(0, Math.max(startY, fluidTopY), 0, bufferCanvasBottomY);
+                if (isOverflow && !isPatched) {
                     gradient.addColorStop(0, 'rgba(248, 81, 73, 0.6)');
                     gradient.addColorStop(1, 'rgba(248, 81, 73, 0.2)');
                 } else {
@@ -99,15 +106,15 @@ export default function StackCanvas({ stack, espIndex, ebpIndex, userInput, step
 
                 ctx.fillStyle = gradient;
                 ctx.beginPath();
-                ctx.moveTo(startX, bufferVisualBottomY);
-                ctx.lineTo(startX, fluidTopY);
+                ctx.moveTo(startX, bufferCanvasBottomY);
+                ctx.lineTo(startX, Math.max(startY, fluidTopY));
 
                 for (let i = 0; i <= blockWidth; i += 5) {
                     const waveOffset = Math.sin(animState.current.time + i * 0.05) * 4;
-                    ctx.lineTo(startX + i, fluidTopY + waveOffset);
+                    ctx.lineTo(startX + i, Math.max(startY, fluidTopY) + waveOffset);
                 }
 
-                ctx.lineTo(startX + blockWidth, bufferVisualBottomY);
+                ctx.lineTo(startX + blockWidth, bufferCanvasBottomY);
                 ctx.closePath();
                 ctx.fill();
                 ctx.restore();
@@ -143,7 +150,7 @@ export default function StackCanvas({ stack, espIndex, ebpIndex, userInput, step
 
         draw();
         return () => cancelAnimationFrame(animationFrameId);
-    }, [stack, espIndex, ebpIndex, userInput, step, level]);
+    }, [stack, espIndex, ebpIndex, userInput, step, level, isPatched]);
 
     return (
         <div style={{ width: '100%', height: '100%', overflow: 'hidden', borderRadius: '8px' }}>
