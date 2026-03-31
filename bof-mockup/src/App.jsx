@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import './index.css'
 
 const CODE_DATA = [
@@ -70,18 +71,14 @@ function App() {
           <span className="line-number">{idx + 1}</span>
           <span className="line-content" dangerouslySetInnerHTML={{ __html: html }}></span>
         </div>
-        {showAssembly && line.asm.length > 0 && (
-          <div className="assembly-block">
-            {line.asm.map((a, i) => (
-              <div key={i} className="assembly-line">{a}</div>
-            ))}
-          </div>
-        )}
       </div>
     );
   };
 
   const handleNextStep = () => {
+    // Check haptic feedback manually when stepping
+    if (navigator.vibrate) navigator.vibrate(10); // Light tick
+
     switch (step) {
       case 0:
         setActiveLineIndex(12); // puts("I will echo...");
@@ -147,6 +144,7 @@ function App() {
         setStatusDesc("vuln() now prepares to return to main. It popping the Saved EBP and jumping to the Return Address in the stack.");
 
         if (userInput.length > 16) {
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]); // heavy vibrate on crash
           setStatusType("danger");
           setStatusTitle("Segmentation Fault!");
           setStatusDesc("The Return Address was overwritten with user data! The CPU jumps to an invalid/garbage address. Execution crashes.");
@@ -195,6 +193,7 @@ function App() {
 
     if (userInput.length > 16) {
       // OVERFLOW HAPPENS
+      if (navigator.vibrate) navigator.vibrate([50, 50, 100]); // Warning vib
       newStack[6].value = "AAAAAAAA";
       newStack[5].value = "AAAAAAAA";
       newStack[6].type = "filled";
@@ -245,6 +244,8 @@ function App() {
     if (type === 'overflow') setUserInput('AAAAAAAAAAAAAAAA++++++++BBBBBBBB'); // 32 chars
   };
 
+  const currentLineData = CODE_DATA[activeLineIndex];
+
   return (
     <div className="app-container">
       <header className="header">
@@ -260,9 +261,9 @@ function App() {
             <span>Vulnerable C Program</span>
             <button
               className="btn btn-secondary btn-small"
-              onClick={() => setShowAssembly(!showAssembly)}
+              onClick={() => setShowAssembly(true)}
             >
-              {showAssembly ? "Hide Assembly" : "Show Assembly"}
+              Peek Assembly
             </button>
           </div>
           <div className="code-container">
@@ -291,20 +292,41 @@ function App() {
           <section className="panel stack-section">
             <div className="panel-header">Memory Stack Frame</div>
             <div className="stack-container">
-              {stack.map((block, index) => (
-                <div key={block.id} className={`stack-frame ${block.type === 'main-frame' ? 'opacity-50' : ''}`}>
-                  <div className="stack-address">{block.address}</div>
-                  <div className={`stack-block ${block.type}`}>
-                    <span className="block-label">{block.label}</span>
-                    <span className="block-value">{block.value}</span>
+              {stack.map((block, index) => {
+                const isEspHere = espIndex === (stack.length - 1 - index);
+                const isEbpHere = ebpIndex === (stack.length - 1 - index);
+
+                return (
+                  <div key={block.id} className={`stack-frame ${block.type === 'main-frame' ? 'opacity-50' : ''}`}>
+                    <div className="stack-address">{block.address}</div>
+                    <div className={`stack-block ${block.type}`}>
+                      <span className="block-label">{block.label}</span>
+                      <span className="block-value">{block.value}</span>
+                    </div>
+                    {/* Pointer Indicators (Framer Motion!) */}
+                    <div className="pointer-container">
+                      {isEspHere && (
+                        <motion.div
+                          layoutId="ESP_POINTER"
+                          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                          className="pointer esp"
+                        >
+                          ESP
+                        </motion.div>
+                      )}
+                      {isEbpHere && (
+                        <motion.div
+                          layoutId="EBP_POINTER"
+                          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                          className={`pointer ebp ${isEspHere ? 'stagger' : ''}`}
+                        >
+                          EBP
+                        </motion.div>
+                      )}
+                    </div>
                   </div>
-                  {/* Pointer Indicators */}
-                  <div className="pointer-container" style={{ right: '-80px' }}>
-                    {espIndex === (stack.length - 1 - index) && <div className="pointer esp">ESP</div>}
-                    {ebpIndex === (stack.length - 1 - index) && <div className="pointer ebp">EBP</div>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -351,6 +373,59 @@ function App() {
         </div>
 
       </main>
+
+      {/* Swipeable Bottom Sheet for Assembly */}
+      <AnimatePresence>
+        {showAssembly && (
+          <>
+            <motion.div
+              className="bottom-sheet-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAssembly(false)}
+            />
+            <div className="bottom-sheet-container">
+              <motion.div
+                className="bottom-sheet"
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                drag="y"
+                dragConstraints={{ top: 0 }}
+                dragElastic={0.2}
+                onDragEnd={(e, info) => {
+                  // Swipe down to close
+                  if (info.offset.y > 100 || info.velocity.y > 500) {
+                    setShowAssembly(false);
+                  }
+                }}
+              >
+                <div className="sheet-handle" />
+                <div className="sheet-content">
+                  <h3>Assembly: <span className="keyword" style={{ fontSize: '0.85rem' }}>{currentLineData.text.trim() || "(No instruction mapped)"}</span></h3>
+
+                  {currentLineData.asm && currentLineData.asm.length > 0 ? (
+                    currentLineData.asm.map((a, i) => (
+                      <div key={i} className="assembly-line highlight">{a}</div>
+                    ))
+                  ) : (
+                    <div className="assembly-line">No assembly execution for this step.</div>
+                  )}
+
+                  <h3 style={{ marginTop: '2rem' }}>CPU Registers</h3>
+                  <div style={{ display: 'flex', gap: '2rem', padding: '1rem', background: '#0a0a0a', borderRadius: '8px', border: '1px solid #30363d' }}>
+                    <div><strong>RSP:</strong> <span className="keyword">{stack[stack.length - 1 - espIndex]?.value || "Unknown"}</span></div>
+                    <div><strong>RBP:</strong> <span className="keyword">{stack[stack.length - 1 - ebpIndex]?.value || "Unknown"}</span></div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
     </div>
   )
 }
