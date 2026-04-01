@@ -65,6 +65,25 @@ public class LevelViewModel extends ViewModel {
     public final LiveData<List<RegisterSnapshot>> snapshots = _snapshots;
     private int snapshotCount = 0;
 
+    /** The timeline index currently being viewed/simulated. Allows scrubbing time without deleting the future. */
+    private final MutableLiveData<Integer> _activeSnapshotIndex = new MutableLiveData<>(-1);
+    public final LiveData<Integer> activeSnapshotIndex = _activeSnapshotIndex;
+    
+    // Feature Toggles (from Burger Menu)
+    private final MutableLiveData<Boolean> _captureEnabled = new MutableLiveData<>(false);
+    public final LiveData<Boolean> captureEnabled = _captureEnabled;
+
+    private final MutableLiveData<Boolean> _timelineVisible = new MutableLiveData<>(false);
+    public final LiveData<Boolean> timelineVisible = _timelineVisible;
+
+    public void toggleCaptureEnabled() {
+        _captureEnabled.setValue(!Boolean.TRUE.equals(_captureEnabled.getValue()));
+    }
+
+    public void toggleTimelineVisible() {
+        _timelineVisible.setValue(!Boolean.TRUE.equals(_timelineVisible.getValue()));
+    }
+
     private Level level;
     private int initialEsp = 0;
 
@@ -100,6 +119,7 @@ public class LevelViewModel extends ViewModel {
         _userInput.setValue("");
         _isPatched.setValue(Boolean.TRUE.equals(_isPatched.getValue())); // preserve patch state
         // Clear timeline
+        _activeSnapshotIndex.setValue(-1);
         snapshotCount = 0;
         _snapshots.setValue(new ArrayList<>());
         recordSnapshot("Program Ready", "main");
@@ -494,6 +514,8 @@ public class LevelViewModel extends ViewModel {
      * @param ripSymbol A symbolic RIP hint (e.g., "main", "vuln", "read@plt")
      */
     public void recordSnapshot(String label, String ripSymbol) {
+        if (!Boolean.TRUE.equals(_captureEnabled.getValue())) return;
+
         List<StackBlock> s = getStack();
 
         // Derive RSP address from current ESP block
@@ -521,6 +543,14 @@ public class LevelViewModel extends ViewModel {
         String statusType = _statusType.getValue() == null ? "info" : _statusType.getValue();
 
         List<RegisterSnapshot> current = _snapshots.getValue();
+        int active = _activeSnapshotIndex.getValue() == null ? -1 : _activeSnapshotIndex.getValue();
+
+        // If we rewound the timeline and are now taking a new action, overwrite the future
+        if (current != null && active >= 0 && active < current.size() - 1) {
+            current = new ArrayList<>(current.subList(0, active + 1));
+            snapshotCount = current.size();
+        }
+
         List<RegisterSnapshot> next = current == null ? new ArrayList<>() : new ArrayList<>(current);
         int codeLine = lineIdx == null ? 0 : lineIdx;
 
@@ -535,6 +565,7 @@ public class LevelViewModel extends ViewModel {
         next.add(new RegisterSnapshot(snapshotCount++, label, rip, rsp, rbp, statusType, codeLine,
                 simStep, simStack, simEsp, simEbp, simStatusTitle, simStatusDesc, simConsole));
         _snapshots.setValue(next);
+        _activeSnapshotIndex.setValue(snapshotCount - 1);
     }
 
     /**
@@ -554,17 +585,8 @@ public class LevelViewModel extends ViewModel {
 
         updateHexDump();
 
-        // Truncate the timeline so future steps rewrite history
-        List<RegisterSnapshot> current = _snapshots.getValue();
-        if (current != null) {
-            List<RegisterSnapshot> truncated = new ArrayList<>();
-            for (RegisterSnapshot s : current) {
-                truncated.add(s);
-                if (s.stepIndex == snap.stepIndex) break;
-            }
-            snapshotCount = snap.stepIndex + 1;
-            _snapshots.setValue(truncated);
-        }
+        // Do not truncate the timeline yet. Just move the active viewing index.
+        _activeSnapshotIndex.setValue(snap.stepIndex);
     }
 
 

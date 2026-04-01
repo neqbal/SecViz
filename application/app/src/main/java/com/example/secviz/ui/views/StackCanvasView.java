@@ -76,6 +76,7 @@ public class StackCanvasView extends View {
 
     public void setStack(List<StackBlock> stack) {
         this.stack = stack;
+        requestLayout();
         invalidate();
     }
 
@@ -88,6 +89,21 @@ public class StackCanvasView extends View {
     public void setIsPatched(boolean p) { this.isPatched = p; }
 
     // ── Drawing ───────────────────────────────────────────────────────────────
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int w = MeasureSpec.getSize(widthMeasureSpec);
+        int h = MeasureSpec.getSize(heightMeasureSpec);
+        
+        float density = getResources().getDisplayMetrics().density;
+        // Guarantee at least 60dp per block so text never overlaps
+        int minHeight = (int) (60 * density * Math.max(1, stack.size()));
+        
+        int modeH = MeasureSpec.getMode(heightMeasureSpec);
+        int finalH = (modeH == MeasureSpec.EXACTLY) ? h : Math.max(h, minHeight);
+        
+        setMeasuredDimension(w, finalH);
+    }
 
     @Override
     protected void onDraw(Canvas canvas) {

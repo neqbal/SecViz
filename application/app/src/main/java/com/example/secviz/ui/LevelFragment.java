@@ -146,9 +146,44 @@ public class LevelFragment extends Fragment {
             rvCode.smoothScrollToPosition(
                     Math.max(0, Math.min(snap.codeLine, codeAdapter.getItemCount() - 1)));
         });
-        // HEX toggle button opens the right drawer
-        btnHexToggle.setOnClickListener(v ->
-                drawerLayout.openDrawer(GravityCompat.END));
+        // Timeline visibility
+        View cardTimeline = root.findViewById(R.id.card_register_timeline);
+        viewModel.timelineVisible.observe(getViewLifecycleOwner(), visible -> {
+            cardTimeline.setVisibility(Boolean.TRUE.equals(visible) ? View.VISIBLE : View.GONE);
+        });
+
+        // Burger Menu
+        MaterialButton btnMenu = root.findViewById(R.id.btn_menu);
+        btnMenu.setOnClickListener(v -> {
+            android.widget.PopupMenu popup = new android.widget.PopupMenu(requireContext(), v);
+            android.view.Menu menu = popup.getMenu();
+            
+            menu.add(0, 1, 0, "View Hex Dump");
+            
+            String captureText = Boolean.TRUE.equals(viewModel.captureEnabled.getValue()) 
+                    ? "Stop Capturing Snapshots" : "Start Capturing Snapshots";
+            menu.add(0, 2, 0, captureText);
+            
+            String viewText = Boolean.TRUE.equals(viewModel.timelineVisible.getValue()) 
+                    ? "Hide Timeline Strip" : "Show Timeline Strip";
+            menu.add(0, 3, 0, viewText);
+
+            popup.setOnMenuItemClickListener(item -> {
+                switch (item.getItemId()) {
+                    case 1:
+                        drawerLayout.openDrawer(GravityCompat.END);
+                        return true;
+                    case 2:
+                        viewModel.toggleCaptureEnabled();
+                        return true;
+                    case 3:
+                        viewModel.toggleTimelineVisible();
+                        return true;
+                }
+                return false;
+            });
+            popup.show();
+        });
         btnHexClose.setOnClickListener(v ->
                 drawerLayout.closeDrawer(GravityCompat.END));
 
@@ -238,16 +273,21 @@ public class LevelFragment extends Fragment {
                     timelineAdapter.addSnapshot(snaps.get(i));
                 }
                 lastSnapshotCount = newCount;
-                rvTimeline.smoothScrollToPosition(timelineAdapter.getItemCount() - 1);
             } else if (newCount < lastSnapshotCount && newCount > 0) {
-                // Time-travel truncation (rewinding)
+                // Time-travel truncation (rewinding + taking new action)
                 timelineAdapter.truncateSnapshots(newCount);
                 lastSnapshotCount = newCount;
-                rvTimeline.smoothScrollToPosition(newCount - 1);
             } else if (newCount == 0) {
                 // Reset
                 timelineAdapter.clearSnapshots();
                 lastSnapshotCount = 0;
+            }
+        });
+
+        viewModel.activeSnapshotIndex.observe(getViewLifecycleOwner(), idx -> {
+            if (idx != null && idx >= 0) {
+                timelineAdapter.setActiveIndex(idx);
+                rvTimeline.smoothScrollToPosition(idx);
             }
         });
 

@@ -35,21 +35,15 @@ public class RegisterTimelineAdapter
     public void setListener(OnSnapshotClickListener l) { this.listener = l; }
 
     public void addSnapshot(RegisterSnapshot snap) {
-        int prevActive = activeIndex;
         snapshots.add(snap);
-        activeIndex = snapshots.size() - 1;
-        // Only rebind the previous active card (dim it) and insert new one
-        if (prevActive >= 0) notifyItemChanged(prevActive);
-        notifyItemInserted(activeIndex);
+        notifyItemInserted(snapshots.size() - 1);
     }
 
     public void truncateSnapshots(int newSize) {
         if (newSize >= 0 && newSize < snapshots.size()) {
             int removedCount = snapshots.size() - newSize;
             snapshots.subList(newSize, snapshots.size()).clear();
-            activeIndex = newSize - 1;
             notifyItemRangeRemoved(newSize, removedCount);
-            if (activeIndex >= 0) notifyItemChanged(activeIndex);
         }
     }
 
@@ -57,6 +51,15 @@ public class RegisterTimelineAdapter
         snapshots.clear();
         activeIndex = -1;
         notifyDataSetChanged();
+    }
+
+    public void setActiveIndex(int newIndex) {
+        if (newIndex >= 0 && newIndex < snapshots.size() && newIndex != activeIndex) {
+            int oldIndex = activeIndex;
+            activeIndex = newIndex;
+            if (oldIndex >= 0) notifyItemChanged(oldIndex);
+            notifyItemChanged(activeIndex);
+        }
     }
 
     public int getActiveIndex() { return activeIndex; }
