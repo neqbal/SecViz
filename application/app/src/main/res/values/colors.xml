@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Background layers -->
+    <color name="bg_primary">#0D1117</color>
+    <color name="bg_surface">#161B22</color>
+    <color name="bg_elevated">#21262D</color>
+
+    <!-- Borders -->
+    <color name="border">#30363D</color>
+
+    <!-- Text -->
+    <color name="text_primary">#C9D1D9</color>
+    <color name="text_muted">#8B949E</color>
+
+    <!-- Accent / semantic -->
+    <color name="accent">#58A6FF</color>
+    <color name="success">#3FB950</color>
+    <color name="warning">#D29922</color>
+    <color name="danger">#F85149</color>
+    <color name="purple">#A371F7</color>
+
+    <!-- Syntax highlight -->
+    <color name="syntax_keyword">#FF7B72</color>
+    <color name="syntax_function">#D2A8FF</color>
+    <color name="syntax_string">#A5D6FF</color>
+    <color name="syntax_number">#79C0FF</color>
+    <color name="syntax_comment">#8B949E</color>
+
+    <!-- Stack block fill (light alpha applied at runtime) -->
+    <color name="block_main_frame">#1E1128</color>
+    <color name="block_safe">#0D1F0F</color>
+    <color name="block_warn">#1F1500</color>
+    <color name="block_danger">#1F0D0D</color>
+    <color name="block_neutral">#21262D</color>
+    <color name="block_filled">#0D1F2E</color>
+</resources>

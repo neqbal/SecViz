@@ -1,0 +1,263 @@
+package com.example.secviz.ui;
+
+import android.content.Context;
+import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.util.Pair;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.secviz.R;
+import com.example.secviz.data.Level;
+import com.example.secviz.data.StackBlock;
+import com.example.secviz.ui.adapters.CodeLineAdapter;
+import com.example.secviz.ui.adapters.ConsoleAdapter;
+import com.example.secviz.ui.sheets.AssemblyBottomSheet;
+import com.example.secviz.ui.views.StackCanvasView;
+import com.example.secviz.viewmodel.LevelViewModel;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.snackbar.Snackbar;
+import com.google.android.material.textfield.TextInputEditText;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class LevelFragment extends Fragment {
+
+    private static final String ARG_LEVEL_INDEX = "levelIndex";
+
+    private Level level;
+    private LevelViewModel viewModel;
+
+    private RecyclerView rvCode;
+    private RecyclerView rvConsole;
+    private StackCanvasView stackCanvas;
+    private TextView tvStatusTitle, tvStatusDesc, tvLevelTitle, tvLevelSubtitle;
+    private LinearLayout layoutInput;
+    private TextInputEditText etInput;
+    private LinearLayout layoutPresets;
+    private MaterialButton btnNextStep, btnReset, btnNextStage, btnSend;
+    private View snackbarAnchor;
+    private CodeLineAdapter codeAdapter;
+    private ConsoleAdapter consoleAdapter;
+    private List<Pair<String, Boolean>> consoleItems = new ArrayList<>();
+
+    private Runnable onNextLevel;
+
+    public static LevelFragment newInstance(Level level, Runnable onNextLevel) {
+        LevelFragment f = new LevelFragment();
+        f.level = level;
+        f.onNextLevel = onNextLevel;
+        return f;
+    }
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_level, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View root, @Nullable Bundle savedInstanceState) {
+        // Views
+        rvCode = root.findViewById(R.id.rv_code);
+        rvConsole = root.findViewById(R.id.rv_console);
+        stackCanvas = root.findViewById(R.id.stack_canvas);
+        tvStatusTitle = root.findViewById(R.id.tv_status_title);
+        tvStatusDesc = root.findViewById(R.id.tv_status_desc);
+        tvLevelTitle = root.findViewById(R.id.tv_level_title);
+        tvLevelSubtitle = root.findViewById(R.id.tv_level_subtitle);
+        layoutInput = root.findViewById(R.id.layout_input);
+        etInput = root.findViewById(R.id.et_input);
+        layoutPresets = root.findViewById(R.id.layout_presets);
+        btnNextStep = root.findViewById(R.id.btn_next_step);
+        btnReset = root.findViewById(R.id.btn_reset);
+        btnNextStage = root.findViewById(R.id.btn_next_stage);
+        btnSend = root.findViewById(R.id.btn_send);
+        snackbarAnchor = root.findViewById(R.id.snackbar_anchor);
+
+        // Header
+        tvLevelTitle.setText(level.title);
+        tvLevelSubtitle.setText(level.subtitle);
+
+        // ViewModel
+        viewModel = new ViewModelProvider(this).get(LevelViewModel.class);
+        viewModel.init(level);
+
+        // Code RecyclerView
+        codeAdapter = new CodeLineAdapter(
+                level.code,
+                viewModel.getLevel().startCodeLine,
+                false,
+                level.defensePatch,
+                () -> viewModel.togglePatch());
+        rvCode.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvCode.setAdapter(codeAdapter);
+
+        // Console RecyclerView
+        consoleAdapter = new ConsoleAdapter(consoleItems);
+        rvConsole.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvConsole.setAdapter(consoleAdapter);
+
+        // Stack canvas
+        stackCanvas.setLevelId(level.id);
+        stackCanvas.setStack(new ArrayList<>(level.initialStack));
+
+        // Payload preset buttons
+        for (String[] preset : level.payloadPresets) {
+            MaterialButton btn = new MaterialButton(requireContext(),
+                    null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            btn.setText(preset[0]);
+            btn.setTextSize(11f);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMarginEnd(8);
+            btn.setLayoutParams(lp);
+            String val = preset[1];
+            btn.setOnClickListener(v -> {
+                if (etInput != null) etInput.setText(val);
+            });
+            layoutPresets.addView(btn);
+        }
+
+        // ── LiveData observers ────────────────────────────────────────────────
+
+        viewModel.activeLineIndex.observe(getViewLifecycleOwner(), idx -> {
+            codeAdapter.setActiveLine(idx);
+            rvCode.scrollToPosition(idx);
+        });
+
+        viewModel.isPatched.observe(getViewLifecycleOwner(), patched -> {
+            codeAdapter.setPatched(patched);
+            stackCanvas.setIsPatched(patched);
+        });
+
+        viewModel.stack.observe(getViewLifecycleOwner(), stack -> {
+            stackCanvas.setStack(stack);
+        });
+
+        viewModel.espIndex.observe(getViewLifecycleOwner(), idx -> {
+            if (idx < 0) return;
+            stackCanvas.setEspIndex(idx);
+        });
+
+        viewModel.ebpIndex.observe(getViewLifecycleOwner(), idx -> {
+            stackCanvas.setEbpIndex(idx);
+        });
+
+        viewModel.statusTitle.observe(getViewLifecycleOwner(), t -> tvStatusTitle.setText(t));
+        viewModel.statusDesc.observe(getViewLifecycleOwner(), d -> tvStatusDesc.setText(d));
+
+        viewModel.statusType.observe(getViewLifecycleOwner(), type -> {
+            int color;
+            switch (type) {
+                case "danger":  color = ContextCompat.getColor(requireContext(), R.color.danger); break;
+                case "success": color = ContextCompat.getColor(requireContext(), R.color.success); break;
+                case "warn":    color = ContextCompat.getColor(requireContext(), R.color.warning); break;
+                default:        color = ContextCompat.getColor(requireContext(), R.color.text_muted); break;
+            }
+            tvStatusTitle.setTextColor(color);
+        });
+
+        viewModel.step.observe(getViewLifecycleOwner(), s -> {
+            int stepInt = (int)(s * 10);
+            stackCanvas.setStep(s.intValue());
+            boolean waitingForInput = stepInt == 40;
+            layoutInput.setVisibility(waitingForInput ? View.VISIBLE : View.GONE);
+            btnNextStep.setEnabled(!waitingForInput && stepInt != 1000);
+        });
+
+        viewModel.consoleOut.observe(getViewLifecycleOwner(), items -> {
+            consoleItems.clear();
+            consoleItems.addAll(items);
+            consoleAdapter.notifyDataSetChanged();
+            rvConsole.scrollToPosition(consoleItems.size() - 1);
+        });
+
+        viewModel.toast.observe(getViewLifecycleOwner(), t -> {
+            if (t == null) return;
+            boolean isSuccess = Boolean.TRUE.equals(t.second);
+            int bg = isSuccess
+                    ? ContextCompat.getColor(requireContext(), R.color.success)
+                    : ContextCompat.getColor(requireContext(), R.color.danger);
+            Snackbar sb = Snackbar.make(snackbarAnchor, t.first, 4000);
+            sb.getView().setBackgroundColor(bg);
+            sb.setTextColor(0xFFFFFFFF);
+            sb.show();
+            vibrate(isSuccess ? new long[]{50} : new long[]{200, 100, 200});
+        });
+
+        // ── Button listeners ──────────────────────────────────────────────────
+
+        btnNextStep.setOnClickListener(v -> {
+            vibrate(new long[]{20});
+            viewModel.handleNextStep();
+        });
+
+        btnReset.setOnClickListener(v -> viewModel.reset());
+
+        btnNextStage.setOnClickListener(v -> {
+            if (onNextLevel != null) onNextLevel.run();
+        });
+
+        btnSend.setOnClickListener(v -> submitInput());
+        etInput.setOnEditorActionListener((tv, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEND) { submitInput(); return true; }
+            return false;
+        });
+
+        // Assembly sheet
+        root.findViewById(R.id.btn_peek_assembly).setOnClickListener(v -> {
+            Integer lineIdx = viewModel.activeLineIndex.getValue();
+            if (lineIdx == null) return;
+            List<StackBlock> stk = viewModel.stack.getValue();
+            String rsp = (stk != null && viewModel.espIndex.getValue() != null
+                    && viewModel.espIndex.getValue() >= 0
+                    && stk.size() > viewModel.espIndex.getValue())
+                    ? stk.get(viewModel.espIndex.getValue()).value : "—";
+            String rbp = (stk != null && viewModel.ebpIndex.getValue() != null
+                    && viewModel.ebpIndex.getValue() >= 0
+                    && stk.size() > viewModel.ebpIndex.getValue())
+                    ? stk.get(viewModel.ebpIndex.getValue()).value : "—";
+            AssemblyBottomSheet.newInstance(level.code.get(lineIdx), rsp, rbp)
+                    .show(getChildFragmentManager(), "asm");
+        });
+    }
+
+    private void submitInput() {
+        if (etInput == null) return;
+        String input = etInput.getText() != null ? etInput.getText().toString() : "";
+        if (input.isEmpty()) return;
+        viewModel.setUserInput(input);
+        viewModel.submitInput(input);
+        stackCanvas.setUserInput(input);
+        // Hide keyboard
+        InputMethodManager imm = (InputMethodManager)
+                requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(etInput.getWindowToken(), 0);
+    }
+
+    private void vibrate(long[] pattern) {
+        Vibrator v = (Vibrator) requireContext().getSystemService(Context.VIBRATOR_SERVICE);
+        if (v != null && v.hasVibrator()) {
+            v.vibrate(VibrationEffect.createWaveform(pattern, -1));
+        }
+    }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SecViz</string>
+    <string name="next_stage">Next Stage →</string>
+    <string name="reset">Reset</string>
+    <string name="next_step">Next Step</string>
+    <string name="peek_assembly">Peek Assembly</string>
+    <string name="terminal_label">Terminal / STDOUT</string>
+    <string name="enter_payload">Enter payload…</string>
+    <string name="send">Send</string>
+    <string name="fix">🛡️ Fix</string>
+    <string name="patched">🔓 Patched</string>
+    <string name="hotswap_label">Hot-Swap Syscall:</string>
+    <string name="assembly_registers">CPU Registers</string>
+</resources>
