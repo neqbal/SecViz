@@ -13,9 +13,11 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.GravityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -26,6 +28,7 @@ import com.example.secviz.data.Level;
 import com.example.secviz.data.StackBlock;
 import com.example.secviz.ui.adapters.CodeLineAdapter;
 import com.example.secviz.ui.adapters.ConsoleAdapter;
+import com.example.secviz.ui.adapters.HexDumpAdapter;
 import com.example.secviz.ui.sheets.AssemblyBottomSheet;
 import com.example.secviz.ui.views.StackCanvasView;
 import com.example.secviz.viewmodel.LevelViewModel;
@@ -52,8 +55,11 @@ public class LevelFragment extends Fragment {
     private LinearLayout layoutPresets;
     private MaterialButton btnNextStep, btnReset, btnNextStage, btnSend;
     private View snackbarAnchor;
+    private DrawerLayout drawerLayout;
+    private boolean hexDataReceived = false;
     private CodeLineAdapter codeAdapter;
     private ConsoleAdapter consoleAdapter;
+    private HexDumpAdapter hexDumpAdapter;
     private List<Pair<String, Boolean>> consoleItems = new ArrayList<>();
 
     private Runnable onNextLevel;
@@ -91,6 +97,10 @@ public class LevelFragment extends Fragment {
         btnNextStage = root.findViewById(R.id.btn_next_stage);
         btnSend = root.findViewById(R.id.btn_send);
         snackbarAnchor = root.findViewById(R.id.snackbar_anchor);
+        drawerLayout = root.findViewById(R.id.drawer_layout);
+        RecyclerView rvHexDump = root.findViewById(R.id.rv_hex_dump);
+        MaterialButton btnHexToggle = root.findViewById(R.id.btn_hex_toggle);
+        MaterialButton btnHexClose  = root.findViewById(R.id.btn_hex_close);
 
         // Header
         tvLevelTitle.setText(level.title);
@@ -114,6 +124,17 @@ public class LevelFragment extends Fragment {
         consoleAdapter = new ConsoleAdapter(consoleItems);
         rvConsole.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvConsole.setAdapter(consoleAdapter);
+
+        // Hex dump RecyclerView (lives inside the right drawer)
+        hexDumpAdapter = new HexDumpAdapter();
+        rvHexDump.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvHexDump.setAdapter(hexDumpAdapter);
+
+        // HEX toggle button opens the right drawer
+        btnHexToggle.setOnClickListener(v ->
+                drawerLayout.openDrawer(GravityCompat.END));
+        btnHexClose.setOnClickListener(v ->
+                drawerLayout.closeDrawer(GravityCompat.END));
 
         // Stack canvas
         stackCanvas.setLevelId(level.id);
@@ -188,7 +209,34 @@ public class LevelFragment extends Fragment {
             consoleItems.clear();
             consoleItems.addAll(items);
             consoleAdapter.notifyDataSetChanged();
-            rvConsole.scrollToPosition(consoleItems.size() - 1);
+            if (!consoleItems.isEmpty())
+                rvConsole.scrollToPosition(consoleItems.size() - 1);
+        });
+
+        viewModel.hexRows.observe(getViewLifecycleOwner(), rawRows -> {
+            if (rawRows == null || rawRows.isEmpty()) return;
+            // Auto-open the drawer the first time payload data arrives
+            if (!hexDataReceived) {
+                hexDataReceived = true;
+                drawerLayout.openDrawer(GravityCompat.END);
+            }
+            // Convert Object[] rows → HexDumpAdapter.HexRow
+            List<HexDumpAdapter.HexRow> hexRows = new ArrayList<>();
+            for (Object[] raw : rawRows) {
+                String addr   = (String) raw[0];
+                byte[] bytes  = (byte[]) raw[1];
+                int[]  status = (int[])  raw[2];
+                HexDumpAdapter.ByteStatus[] statArr =
+                        new HexDumpAdapter.ByteStatus[HexDumpAdapter.BYTES_PER_ROW];
+                for (int i = 0; i < HexDumpAdapter.BYTES_PER_ROW; i++) {
+                    int s = (i < status.length) ? status[i] : 0;
+                    statArr[i] = s == 2 ? HexDumpAdapter.ByteStatus.OVERFLOW
+                               : s == 1 ? HexDumpAdapter.ByteStatus.FILLED
+                               : HexDumpAdapter.ByteStatus.EMPTY;
+                }
+                hexRows.add(new HexDumpAdapter.HexRow(addr, bytes, statArr));
+            }
+            hexDumpAdapter.submitRows(hexRows);
         });
 
         viewModel.toast.observe(getViewLifecycleOwner(), t -> {

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingVertical="3dp"
+    android:paddingHorizontal="12dp"
+    android:gravity="center_vertical">
+
+    <!-- Address -->
+    <TextView
+        android:id="@+id/tv_hex_addr"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#8B949E"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:paddingEnd="14dp"/>
+
+    <!-- Hex bytes (48 two-char pairs + separators) -->
+    <TextView
+        android:id="@+id/tv_hex_bytes"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.05"
+        android:paddingEnd="16dp"/>
+
+    <!-- Vertical separator -->
+    <View
+        android:layout_width="1dp"
+        android:layout_height="16dp"
+        android:background="#30363D"
+        android:layout_marginEnd="14dp"/>
+
+    <!-- ASCII representation -->
+    <TextView
+        android:id="@+id/tv_hex_ascii"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="11sp"
+        android:fontFamily="monospace"/>
+
+</LinearLayout>

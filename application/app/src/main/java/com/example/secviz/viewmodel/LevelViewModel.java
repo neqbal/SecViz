@@ -53,6 +53,11 @@ public class LevelViewModel extends ViewModel {
     private final MutableLiveData<String> _userInput = new MutableLiveData<>("");
     public final LiveData<String> userInput = _userInput;
 
+    /** Hex dump rows derived from the live stack. List of HexRow-like bundles as raw objects
+     *  to avoid a circular import — encoded as Object[] { address:String, bytes:byte[], status:int[] } */
+    private final MutableLiveData<List<Object[]>> _hexRows = new MutableLiveData<>(new ArrayList<>());
+    public final LiveData<List<Object[]>> hexRows = _hexRows;
+
     private Level level;
     private int initialEsp = 0;
 
@@ -78,6 +83,7 @@ public class LevelViewModel extends ViewModel {
         _step.setValue(0f);
         _activeLineIndex.setValue(level.startCodeLine);
         _stack.setValue(deepCopyStack(level.initialStack));
+        updateHexDump();
         _espIndex.setValue(initialEsp);
         _ebpIndex.setValue(initialEsp);
         _statusTitle.setValue("Program Ready");
@@ -165,6 +171,7 @@ public class LevelViewModel extends ViewModel {
             s.get(retIdx).value = level.id.equals("1") ? "0x400490" : "0x4004ec";
         }
         _stack.setValue(s);
+        updateHexDump();
         _espIndex.setValue(retIdx);
     }
 
@@ -185,6 +192,7 @@ public class LevelViewModel extends ViewModel {
         int vulnEbpIdx = initialEsp + 2;
         if (vulnEbpIdx < s.size()) s.get(vulnEbpIdx).value = "0x7ffe4";
         _stack.setValue(s);
+        updateHexDump();
         _ebpIndex.setValue(vulnEbpIdx);
 
         int buff0Idx = findBlock("buff[0..7]");
@@ -206,6 +214,7 @@ public class LevelViewModel extends ViewModel {
             setBlockValue(s, "secret_key[8..15]", "CRET_KEY");
         }
         _stack.setValue(s);
+        updateHexDump();
         _step.setValue(3f);
     }
 
@@ -258,7 +267,7 @@ public class LevelViewModel extends ViewModel {
             if (processedInput.length() > maxLen) processedInput = processedInput.substring(0, maxLen);
         }
 
-        List<StackBlock> newStack = deepCopyStack(level.initialStack);
+        List<StackBlock> newStack = deepCopyStack(getStack());
         int bufferStartIdx = findBlockIndex(newStack, "buff[0");
         int currentIdx = bufferStartIdx;
         boolean hasOverflowed = false;
@@ -281,6 +290,7 @@ public class LevelViewModel extends ViewModel {
         }
 
         _stack.setValue(newStack);
+        updateHexDump();
         _statusTitle.setValue(hasOverflowed ? "BUFFER OVERFLOW!" : "Input Received Safely");
         _statusType.setValue(hasOverflowed ? "danger" : "success");
         _step.setValue(5f);
@@ -449,5 +459,75 @@ public class LevelViewModel extends ViewModel {
         List<StackBlock> copy = new ArrayList<>();
         for (StackBlock b : source) copy.add(b.copy());
         return copy;
+    }
+
+    // ── Hex Dump Builder ──────────────────────────────────────────────────────
+
+    /**
+     * Converts the current stack into rows of 16 bytes for the hex dump panel.
+     * Each Object[] entry: { address:String, bytes:byte[16], status:int[16] }
+     * status values: 0=empty, 1=filled(safe), 2=overflow(danger)
+     */
+    private void updateHexDump() {
+        List<StackBlock> s = getStack();
+        if (s == null) return;
+
+        // Collect all blocks that are part of the visible region (buff + adjacent)
+        // We build a flat byte array representing them from bottom-address to top
+        // For simplicity, present each 8-byte block as one hex row half.
+        List<Object[]> rows = new ArrayList<>();
+
+        // Walk stack in reverse (ascending address order = bottom to top on screen)
+        for (int i = s.size() - 1; i >= 0; i--) {
+            StackBlock block = s.get(i);
+            // Skip the very top main frame data block
+            if (block.type.equals(StackBlock.TYPE_MAIN_FRAME) && !block.label.contains("Return")) continue;
+
+            String rawValue = block.value;
+            byte[] blockBytes = new byte[8];
+            int status = 0; // empty
+
+            if (!rawValue.equals("0x0") && !rawValue.equals("0x...") && !rawValue.isEmpty()) {
+                // Determine status from block type
+                if (block.type.equals(StackBlock.TYPE_DANGER)) status = 2;
+                else if (block.type.equals(StackBlock.TYPE_FILLED) ||
+                         block.type.equals(StackBlock.TYPE_WARN) ||
+                         block.type.equals(StackBlock.TYPE_SAFE)) status = 1;
+                else status = 0;
+
+                // Encode the string value as UTF-8 bytes (truncated/padded to 8)
+                if (rawValue.startsWith("0x")) {
+                    // Looks like an address hex value — encode as little-endian
+                    try {
+                        long addr = Long.parseUnsignedLong(rawValue.substring(2), 16);
+                        for (int b2 = 0; b2 < 8; b2++) {
+                            blockBytes[b2] = (byte)(addr & 0xFF);
+                            addr >>= 8;
+                        }
+                        if (status == 0) status = 1; // addresses count as filled
+                    } catch (NumberFormatException e) {
+                        byte[] encoded = rawValue.getBytes();
+                        System.arraycopy(encoded, 0, blockBytes, 0,
+                                Math.min(encoded.length, 8));
+                    }
+                } else {
+                    byte[] encoded = rawValue.getBytes();
+                    System.arraycopy(encoded, 0, blockBytes, 0,
+                            Math.min(encoded.length, 8));
+                }
+            }
+
+            // Emit one row per 8-byte block (addr | 8 hex bytes | 8 ascii)
+            // We pair two consecutive blocks into one 16-byte row if possible,
+            // but for clarity emit 8-byte half-rows here and let the adapter pair them.
+            byte[] rowBytes = new byte[16];
+            int[] rowStatus = new int[16];
+            System.arraycopy(blockBytes, 0, rowBytes, 0, 8);
+            // second half empty — adapter shows partial rows fine
+            for (int j = 0; j < 8; j++) rowStatus[j] = status;
+            rows.add(new Object[]{block.address, rowBytes, rowStatus});
+        }
+
+        _hexRows.setValue(rows);
     }
 }
