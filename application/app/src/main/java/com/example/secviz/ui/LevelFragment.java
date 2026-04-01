@@ -102,7 +102,6 @@ public class LevelFragment extends Fragment {
         snackbarAnchor = root.findViewById(R.id.snackbar_anchor);
         drawerLayout = root.findViewById(R.id.drawer_layout);
         RecyclerView rvHexDump = root.findViewById(R.id.rv_hex_dump);
-        MaterialButton btnHexToggle = root.findViewById(R.id.btn_hex_toggle);
         MaterialButton btnHexClose  = root.findViewById(R.id.btn_hex_close);
 
         // Header
@@ -146,44 +145,16 @@ public class LevelFragment extends Fragment {
             rvCode.smoothScrollToPosition(
                     Math.max(0, Math.min(snap.codeLine, codeAdapter.getItemCount() - 1)));
         });
+        
         // Timeline visibility
         View cardTimeline = root.findViewById(R.id.card_register_timeline);
         viewModel.timelineVisible.observe(getViewLifecycleOwner(), visible -> {
             cardTimeline.setVisibility(Boolean.TRUE.equals(visible) ? View.VISIBLE : View.GONE);
         });
 
-        // Burger Menu
+        // Burger Menu — custom dark-themed popup
         MaterialButton btnMenu = root.findViewById(R.id.btn_menu);
-        btnMenu.setOnClickListener(v -> {
-            android.widget.PopupMenu popup = new android.widget.PopupMenu(requireContext(), v);
-            android.view.Menu menu = popup.getMenu();
-            
-            menu.add(0, 1, 0, "View Hex Dump");
-            
-            String captureText = Boolean.TRUE.equals(viewModel.captureEnabled.getValue()) 
-                    ? "Stop Capturing Snapshots" : "Start Capturing Snapshots";
-            menu.add(0, 2, 0, captureText);
-            
-            String viewText = Boolean.TRUE.equals(viewModel.timelineVisible.getValue()) 
-                    ? "Hide Timeline Strip" : "Show Timeline Strip";
-            menu.add(0, 3, 0, viewText);
-
-            popup.setOnMenuItemClickListener(item -> {
-                switch (item.getItemId()) {
-                    case 1:
-                        drawerLayout.openDrawer(GravityCompat.END);
-                        return true;
-                    case 2:
-                        viewModel.toggleCaptureEnabled();
-                        return true;
-                    case 3:
-                        viewModel.toggleTimelineVisible();
-                        return true;
-                }
-                return false;
-            });
-            popup.show();
-        });
+        btnMenu.setOnClickListener(v -> showCustomMenu(v));
         btnHexClose.setOnClickListener(v ->
                 drawerLayout.closeDrawer(GravityCompat.END));
 
@@ -385,5 +356,76 @@ public class LevelFragment extends Fragment {
         if (v != null && v.hasVibrator()) {
             v.vibrate(VibrationEffect.createWaveform(pattern, -1));
         }
+    }
+
+    private void showCustomMenu(View anchor) {
+        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(requireContext());
+        View panel = inflater.inflate(R.layout.popup_menu_panel, null, false);
+
+        // Measure so we know the width for positioning
+        panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+
+        boolean capturing = Boolean.TRUE.equals(viewModel.captureEnabled.getValue());
+        boolean visible   = Boolean.TRUE.equals(viewModel.timelineVisible.getValue());
+
+        // Capture badge
+        TextView captureBadge = panel.findViewById(R.id.mi_capture_badge);
+        TextView captureIcon  = panel.findViewById(R.id.mi_capture_icon);
+        if (capturing) {
+            captureBadge.setText("ON");
+            captureBadge.setTextColor(0xFF3FB950);
+            captureIcon.setText("◉");
+            captureIcon.setTextColor(0xFF3FB950);
+        } else {
+            captureBadge.setText("OFF");
+            captureBadge.setTextColor(0xFF8B949E);
+            captureIcon.setText("◯");
+            captureIcon.setTextColor(0xFF8B949E);
+        }
+
+        // Timeline row — only visible if capture is on or timeline was already shown
+        View miTimeline = panel.findViewById(R.id.mi_timeline);
+        TextView timelineBadge = panel.findViewById(R.id.mi_timeline_badge);
+        if (capturing || visible) {
+            miTimeline.setVisibility(View.VISIBLE);
+            if (visible) {
+                timelineBadge.setText("VISIBLE");
+                timelineBadge.setTextColor(0xFF58A6FF);
+            } else {
+                timelineBadge.setText("HIDDEN");
+                timelineBadge.setTextColor(0xFF8B949E);
+            }
+        } else {
+            miTimeline.setVisibility(View.GONE);
+        }
+
+        android.widget.PopupWindow popup = new android.widget.PopupWindow(
+                panel,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                true);
+        popup.setElevation(24f);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
+        popup.setOutsideTouchable(true);
+
+        // Click listeners — dismiss after action
+        panel.findViewById(R.id.mi_hex).setOnClickListener(v2 -> {
+            popup.dismiss();
+            drawerLayout.openDrawer(GravityCompat.END);
+        });
+        panel.findViewById(R.id.mi_capture).setOnClickListener(v2 -> {
+            popup.dismiss();
+            viewModel.toggleCaptureEnabled();
+        });
+        miTimeline.setOnClickListener(v2 -> {
+            popup.dismiss();
+            viewModel.toggleTimelineVisible();
+        });
+
+        int[] loc = new int[2];
+        anchor.getLocationInWindow(loc);
+        popup.showAtLocation(anchor, android.view.Gravity.NO_GRAVITY,
+                loc[0] + anchor.getWidth() - panel.getMeasuredWidth(),
+                loc[1] + anchor.getHeight() + 8);
     }
 }

@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="260dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_popup_menu"
+    android:paddingVertical="8dp">
+
+    <!-- ── Section: Memory ─────────────────────────────────────── -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="6dp"
+        android:text="MEMORY"
+        android:textSize="10sp"
+        android:letterSpacing="0.15"
+        android:fontFamily="monospace"
+        android:textColor="#4A5568"/>
+
+    <!-- Hex Dump row -->
+    <LinearLayout
+        android:id="@+id/mi_hex"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:background="@drawable/bg_menu_item_ripple"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:layout_width="28dp"
+            android:layout_height="wrap_content"
+            android:text="⬡"
+            android:textSize="16sp"
+            android:textColor="#58A6FF"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="View Hex Dump"
+            android:textSize="14sp"
+            android:textColor="#C9D1D9"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="›"
+            android:textSize="18sp"
+            android:textColor="#4A5568"/>
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginVertical="4dp"
+        android:background="#1E2530"/>
+
+    <!-- ── Section: Snapshots ───────────────────────────────────── -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="6dp"
+        android:text="SNAPSHOTS"
+        android:textSize="10sp"
+        android:letterSpacing="0.15"
+        android:fontFamily="monospace"
+        android:textColor="#4A5568"/>
+
+    <!-- Capture on/off row -->
+    <LinearLayout
+        android:id="@+id/mi_capture"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:background="@drawable/bg_menu_item_ripple"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:layout_width="28dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/mi_capture_icon"
+            android:text="◯"
+            android:textSize="16sp"
+            android:textColor="#8B949E"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Capture Snapshots"
+                android:textSize="14sp"
+                android:textColor="#C9D1D9"/>
+
+            <TextView
+                android:id="@+id/mi_capture_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Records state at every step"
+                android:textSize="11sp"
+                android:textColor="#4A5568"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/mi_capture_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="2dp"
+            android:text="OFF"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:textColor="#8B949E"
+            android:background="@drawable/bg_snapshot_card"/>
+    </LinearLayout>
+
+    <!-- View Timeline row (hidden until capture is on) -->
+    <LinearLayout
+        android:id="@+id/mi_timeline"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:background="@drawable/bg_menu_item_ripple"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="28dp"
+            android:layout_height="wrap_content"
+            android:text="≡"
+            android:textSize="16sp"
+            android:textColor="#8B949E"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="Show Timeline Strip"
+            android:textSize="14sp"
+            android:textColor="#C9D1D9"/>
+
+        <TextView
+            android:id="@+id/mi_timeline_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="2dp"
+            android:text="HIDDEN"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:textColor="#8B949E"
+            android:background="@drawable/bg_snapshot_card"/>
+    </LinearLayout>
+
+</LinearLayout>
