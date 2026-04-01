@@ -29,6 +29,7 @@ import com.example.secviz.data.StackBlock;
 import com.example.secviz.ui.adapters.CodeLineAdapter;
 import com.example.secviz.ui.adapters.ConsoleAdapter;
 import com.example.secviz.ui.adapters.HexDumpAdapter;
+import com.example.secviz.ui.adapters.RegisterTimelineAdapter;
 import com.example.secviz.ui.sheets.AssemblyBottomSheet;
 import com.example.secviz.ui.views.StackCanvasView;
 import com.example.secviz.viewmodel.LevelViewModel;
@@ -60,6 +61,8 @@ public class LevelFragment extends Fragment {
     private CodeLineAdapter codeAdapter;
     private ConsoleAdapter consoleAdapter;
     private HexDumpAdapter hexDumpAdapter;
+    private RegisterTimelineAdapter timelineAdapter;
+    private int lastSnapshotCount = 0;
     private List<Pair<String, Boolean>> consoleItems = new ArrayList<>();
 
     private Runnable onNextLevel;
@@ -125,11 +128,24 @@ public class LevelFragment extends Fragment {
         rvConsole.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvConsole.setAdapter(consoleAdapter);
 
-        // Hex dump RecyclerView (lives inside the right drawer)
+        // Hex dump RecyclerView (inside right drawer)
         hexDumpAdapter = new HexDumpAdapter();
         rvHexDump.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvHexDump.setAdapter(hexDumpAdapter);
 
+        // Register timeline (horizontal strip)
+        RecyclerView rvTimeline = root.findViewById(R.id.rv_register_timeline);
+        timelineAdapter = new RegisterTimelineAdapter();
+        LinearLayoutManager tlm = new LinearLayoutManager(
+                requireContext(), LinearLayoutManager.HORIZONTAL, false);
+        rvTimeline.setLayoutManager(tlm);
+        rvTimeline.setAdapter(timelineAdapter);
+        // Tap: time-travel rewind to this snapshot
+        timelineAdapter.setListener(snap -> {
+            viewModel.restoreSnapshot(snap);
+            rvCode.smoothScrollToPosition(
+                    Math.max(0, Math.min(snap.codeLine, codeAdapter.getItemCount() - 1)));
+        });
         // HEX toggle button opens the right drawer
         btnHexToggle.setOnClickListener(v ->
                 drawerLayout.openDrawer(GravityCompat.END));
@@ -211,6 +227,28 @@ public class LevelFragment extends Fragment {
             consoleAdapter.notifyDataSetChanged();
             if (!consoleItems.isEmpty())
                 rvConsole.scrollToPosition(consoleItems.size() - 1);
+        });
+
+        // Register timeline observer
+        viewModel.snapshots.observe(getViewLifecycleOwner(), snaps -> {
+            if (snaps == null) return;
+            int newCount = snaps.size();
+            if (newCount > lastSnapshotCount) {
+                for (int i = lastSnapshotCount; i < newCount; i++) {
+                    timelineAdapter.addSnapshot(snaps.get(i));
+                }
+                lastSnapshotCount = newCount;
+                rvTimeline.smoothScrollToPosition(timelineAdapter.getItemCount() - 1);
+            } else if (newCount < lastSnapshotCount && newCount > 0) {
+                // Time-travel truncation (rewinding)
+                timelineAdapter.truncateSnapshots(newCount);
+                lastSnapshotCount = newCount;
+                rvTimeline.smoothScrollToPosition(newCount - 1);
+            } else if (newCount == 0) {
+                // Reset
+                timelineAdapter.clearSnapshots();
+                lastSnapshotCount = 0;
+            }
         });
 
         viewModel.hexRows.observe(getViewLifecycleOwner(), rawRows -> {

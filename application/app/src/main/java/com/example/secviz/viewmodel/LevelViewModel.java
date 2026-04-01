@@ -7,6 +7,7 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
 import com.example.secviz.data.Level;
+import com.example.secviz.data.RegisterSnapshot;
 import com.example.secviz.data.StackBlock;
 
 import java.util.ArrayList;
@@ -58,6 +59,12 @@ public class LevelViewModel extends ViewModel {
     private final MutableLiveData<List<Object[]>> _hexRows = new MutableLiveData<>(new ArrayList<>());
     public final LiveData<List<Object[]>> hexRows = _hexRows;
 
+    /** Register state snapshots — one per executed step, for the timeline UI */
+    private final MutableLiveData<List<RegisterSnapshot>> _snapshots =
+            new MutableLiveData<>(new ArrayList<>());
+    public final LiveData<List<RegisterSnapshot>> snapshots = _snapshots;
+    private int snapshotCount = 0;
+
     private Level level;
     private int initialEsp = 0;
 
@@ -92,6 +99,10 @@ public class LevelViewModel extends ViewModel {
         _consoleOut.setValue(new ArrayList<>());
         _userInput.setValue("");
         _isPatched.setValue(Boolean.TRUE.equals(_isPatched.getValue())); // preserve patch state
+        // Clear timeline
+        snapshotCount = 0;
+        _snapshots.setValue(new ArrayList<>());
+        recordSnapshot("Program Ready", "main");
     }
 
     public void setUserInput(String input) {
@@ -149,10 +160,12 @@ public class LevelViewModel extends ViewModel {
             addConsole("I will echo whatever you say.", false);
             _statusTitle.setValue("Executing puts()");
             _step.setValue(1f);
+            recordSnapshot("puts() in main", "puts@plt");
         } else {
             _statusTitle.setValue("Calling vuln()");
             pushReturnAddr(patched);
             _step.setValue(2f);
+            recordSnapshot("call vuln()", "vuln");
         }
     }
 
@@ -162,6 +175,7 @@ public class LevelViewModel extends ViewModel {
         _statusTitle.setValue("Calling vuln()");
         pushReturnAddr(patched);
         _step.setValue(2f);
+        recordSnapshot("call vuln()", "vuln");
     }
 
     private void pushReturnAddr(boolean patched) {
@@ -200,6 +214,7 @@ public class LevelViewModel extends ViewModel {
 
         boolean firstIsNotBuff = !level.code.get(firstVarIdx).text.contains("char buff");
         _step.setValue(firstIsNotBuff ? 2.5f : 3f);
+        recordSnapshot("vuln() prologue", "vuln");
     }
 
     private void step2_5() {
@@ -216,6 +231,7 @@ public class LevelViewModel extends ViewModel {
         _stack.setValue(s);
         updateHexDump();
         _step.setValue(3f);
+        recordSnapshot("alloc buff[]", "vuln");
     }
 
     private void step3(boolean patched) {
@@ -233,15 +249,17 @@ public class LevelViewModel extends ViewModel {
             addConsole(printed, false);
             _statusTitle.setValue("Executing puts()");
             _step.setValue(3.5f);
+            recordSnapshot("puts() in vuln", "puts@plt");
         } else {
             _activeLineIndex.setValue(readIdx);
             if (level.id.equals("2a")) {
                 _statusDesc.setValue(patched
-                        ? "read() securely terminates the buffer. The secret is completely safe!"
-                        : "read() bounds-check to 16 bytes but no null-terminator. Fill exactly 16 bytes to leak the secret!");
+                        ? "read() securely terminates the buffer."
+                        : "read() bounds-check to 16 bytes but no null-terminator.");
             }
             _statusTitle.setValue("read() Execution");
             _step.setValue(4f);
+            recordSnapshot("read() ← awaiting input", "read@plt");
         }
     }
 
@@ -255,6 +273,7 @@ public class LevelViewModel extends ViewModel {
         }
         _statusTitle.setValue("read() Execution");
         _step.setValue(4f);
+        recordSnapshot("read() ← awaiting input", "read@plt");
     }
 
     public void submitInput(String input) {
@@ -294,6 +313,7 @@ public class LevelViewModel extends ViewModel {
         _statusTitle.setValue(hasOverflowed ? "BUFFER OVERFLOW!" : "Input Received Safely");
         _statusType.setValue(hasOverflowed ? "danger" : "success");
         _step.setValue(5f);
+        recordSnapshot(hasOverflowed ? "OVERFLOW!" : "Input safe", "read@plt");
     }
 
     private void step5(String input, boolean patched) {
@@ -313,6 +333,7 @@ public class LevelViewModel extends ViewModel {
             _statusTitle.setValue("vuln() Epilogue");
         }
         _step.setValue(6f);
+        recordSnapshot("printf() output", "printf@plt");
     }
 
     private void step6(String input, boolean patched) {
@@ -334,20 +355,20 @@ public class LevelViewModel extends ViewModel {
         if (!returnedSafely) {
             _statusType.setValue("danger");
             _statusTitle.setValue("Segmentation Fault!");
-            _statusDesc.setValue("Execution crashed. The Return Address did not point to a valid function.");
+            _statusDesc.setValue("Execution crashed.");
             _step.setValue(100f);
-            if (level.goal.equals("CRASH")) {
-                triggerWin(false);
-            }
+            recordSnapshot("SIGSEGV", "0x????????");
+            if (level.goal.equals("CRASH")) triggerWin(false);
         } else {
             if (patched && input.length() > 16 && level.goal.equals("CRASH")) {
-                _statusDesc.setValue("Defended! The boundaries prevented the payload from overflowing past buff.");
+                _statusDesc.setValue("Defended!");
                 _statusType.setValue("success");
                 triggerWin(true);
             }
             _espIndex.setValue(Math.max(0, initialEsp - 1));
             _ebpIndex.setValue(initialEsp);
             _step.setValue(7f);
+            recordSnapshot("ret from vuln()", "main");
         }
     }
 
@@ -363,11 +384,13 @@ public class LevelViewModel extends ViewModel {
             _statusTitle.setValue("Returned Safely to main()");
             addConsole("Goodbye!!!", false);
             _step.setValue(8f);
+            recordSnapshot("puts() in main", "puts@plt");
         } else {
             int endMain = findClosingBraceAfter(level.startCodeLine);
             _activeLineIndex.setValue(endMain);
             _statusTitle.setValue("Program Exited");
             _step.setValue(100f);
+            recordSnapshot("main() exited", "exit");
             checkLeakWin();
         }
     }
@@ -377,6 +400,7 @@ public class LevelViewModel extends ViewModel {
         _activeLineIndex.setValue(endMain);
         _statusTitle.setValue("Program Exited");
         _step.setValue(100f);
+        recordSnapshot("main() exited", "exit");
         if (level.goal.equals("LEAK")) checkLeakWin();
     }
 
@@ -460,6 +484,89 @@ public class LevelViewModel extends ViewModel {
         for (StackBlock b : source) copy.add(b.copy());
         return copy;
     }
+
+    // ── Register Snapshot Recorder ────────────────────────────────────────────
+
+    /**
+     * Captures the current register state and appends it to the timeline.
+     *
+     * @param label     Short human-readable step description
+     * @param ripSymbol A symbolic RIP hint (e.g., "main", "vuln", "read@plt")
+     */
+    public void recordSnapshot(String label, String ripSymbol) {
+        List<StackBlock> s = getStack();
+
+        // Derive RSP address from current ESP block
+        String rsp = "—", rbp = "—";
+        Integer espIdx = _espIndex.getValue();
+        Integer ebpIdx = _ebpIndex.getValue();
+        if (s != null && espIdx != null && espIdx >= 0 && espIdx < s.size())
+            rsp = s.get(espIdx).address;
+        if (s != null && ebpIdx != null && ebpIdx >= 0 && ebpIdx < s.size())
+            rbp = s.get(ebpIdx).address;
+
+        // RIP: derive from active code line's first asm instruction or use symbol
+        String rip = ripSymbol;
+        Integer lineIdx = _activeLineIndex.getValue();
+        if (lineIdx != null && level != null && lineIdx < level.code.size()) {
+            java.util.List<String> asm = level.code.get(lineIdx).asm;
+            if (asm != null && !asm.isEmpty()) {
+                String firstAsm = asm.get(0).trim();
+                // Extract address from "  401234:   push rbp" format
+                int colon = firstAsm.indexOf(':');
+                if (colon > 0) rip = "0x" + firstAsm.substring(0, colon).trim();
+            }
+        }
+
+        String statusType = _statusType.getValue() == null ? "info" : _statusType.getValue();
+
+        List<RegisterSnapshot> current = _snapshots.getValue();
+        List<RegisterSnapshot> next = current == null ? new ArrayList<>() : new ArrayList<>(current);
+        int codeLine = lineIdx == null ? 0 : lineIdx;
+
+        float simStep = _step.getValue() == null ? 0f : _step.getValue();
+        List<StackBlock> simStack = s == null ? new ArrayList<>() : deepCopyStack(s);
+        int simEsp = espIdx == null ? 0 : espIdx;
+        int simEbp = ebpIdx == null ? 0 : ebpIdx;
+        String simStatusTitle = _statusTitle.getValue() == null ? "" : _statusTitle.getValue();
+        String simStatusDesc = _statusDesc.getValue() == null ? "" : _statusDesc.getValue();
+        List<Pair<String, Boolean>> simConsole = _consoleOut.getValue() == null ? new ArrayList<>() : new ArrayList<>(_consoleOut.getValue());
+
+        next.add(new RegisterSnapshot(snapshotCount++, label, rip, rsp, rbp, statusType, codeLine,
+                simStep, simStack, simEsp, simEbp, simStatusTitle, simStatusDesc, simConsole));
+        _snapshots.setValue(next);
+    }
+
+    /**
+     * Time-travel Debugging: Restores the simulation exactly to the captured state.
+     * Truncates the timeline history back to this point so execution diverges from here.
+     */
+    public void restoreSnapshot(RegisterSnapshot snap) {
+        _step.setValue(snap.simStep);
+        _activeLineIndex.setValue(snap.codeLine);
+        _stack.setValue(deepCopyStack(snap.simStack));
+        _espIndex.setValue(snap.simEsp);
+        _ebpIndex.setValue(snap.simEbp);
+        _statusTitle.setValue(snap.simStatusTitle);
+        _statusDesc.setValue(snap.simStatusDesc);
+        _statusType.setValue(snap.statusType);
+        _consoleOut.setValue(new ArrayList<>(snap.simConsole));
+
+        updateHexDump();
+
+        // Truncate the timeline so future steps rewrite history
+        List<RegisterSnapshot> current = _snapshots.getValue();
+        if (current != null) {
+            List<RegisterSnapshot> truncated = new ArrayList<>();
+            for (RegisterSnapshot s : current) {
+                truncated.add(s);
+                if (s.stepIndex == snap.stepIndex) break;
+            }
+            snapshotCount = snap.stepIndex + 1;
+            _snapshots.setValue(truncated);
+        }
+    }
+
 
     // ── Hex Dump Builder ──────────────────────────────────────────────────────
 
