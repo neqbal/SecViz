@@ -1,15 +1,16 @@
 package com.example.secviz.ui.views;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.core.content.ContextCompat;
@@ -22,6 +23,24 @@ import java.util.List;
 
 public class StackCanvasView extends View {
 
+    // ── Selection support ─────────────────────────────────────────────────────
+    public enum SelectionMode {
+        NONE,
+        JUNK_SELECT,    // user taps first then last block for junk range
+        ADDRESS_SELECT  // user taps the single block to receive the target address
+    }
+
+    public interface BlockTapListener {
+        void onBlockTapped(int blockIndex);
+    }
+
+    private SelectionMode selectionMode = SelectionMode.NONE;
+    private int junkStartIndex = -1;
+    private int junkEndIndex   = -1;
+    private int targetIndex    = -1;
+    private BlockTapListener blockTapListener;
+
+    // ── Simulation state ──────────────────────────────────────────────────────
     private List<StackBlock> stack = new ArrayList<>();
     private int espIndex = 0;
     private int ebpIndex = 0;
@@ -36,13 +55,18 @@ public class StackCanvasView extends View {
     private float animEbpY = 0f;
     private float time = 0f;
 
-    private final Paint blockPaint = new Paint();
-    private final Paint borderPaint = new Paint();
-    private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint valuePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    // Shake animation for invalid tap
+    private float shakeOffsetX = 0f;
+    private int shakeTargetBlock = -1;
+
+    private final Paint blockPaint   = new Paint();
+    private final Paint borderPaint  = new Paint();
+    private final Paint labelPaint   = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint valuePaint   = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint addressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint fluidPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint fluidPaint   = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pointerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint overlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     public StackCanvasView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -56,7 +80,7 @@ public class StackCanvasView extends View {
 
     private void init() {
         borderPaint.setStyle(Paint.Style.STROKE);
-        borderPaint.setStrokeWidth(2f);
+        borderPaint.setStrokeWidth(2.5f);
         labelPaint.setTextSize(28f);
         labelPaint.setColor(Color.parseColor("#C9D1D9"));
         valuePaint.setTextSize(28f);
@@ -68,11 +92,10 @@ public class StackCanvasView extends View {
         pointerPaint.setTextSize(26f);
         pointerPaint.setFakeBoldText(true);
         pointerPaint.setColor(Color.parseColor("#0D1117"));
-        // Animate continuously
         setLayerType(LAYER_TYPE_SOFTWARE, null);
     }
 
-    // ── Public setters ─────────────────────────────────────────────────────────
+    // ── Public setters ────────────────────────────────────────────────────────
 
     public void setStack(List<StackBlock> stack) {
         this.stack = stack;
@@ -82,28 +105,121 @@ public class StackCanvasView extends View {
 
     public void setEspIndex(int idx) { this.espIndex = idx; invalidate(); }
     public void setEbpIndex(int idx) { this.ebpIndex = idx; invalidate(); }
-
     public void setUserInput(String input) { this.userInput = input; }
     public void setStep(int s) { this.step = s; }
     public void setLevelId(String id) { this.levelId = id; }
     public void setIsPatched(boolean p) { this.isPatched = p; }
 
-    // ── Drawing ───────────────────────────────────────────────────────────────
+    // ── Selection API ─────────────────────────────────────────────────────────
+
+    public void setSelectionMode(SelectionMode mode) {
+        this.selectionMode = mode;
+        setClickable(mode != SelectionMode.NONE);
+        invalidate();
+    }
+
+    public void setBlockTapListener(BlockTapListener listener) {
+        this.blockTapListener = listener;
+    }
+
+    /** Programmatically mark the junk range (after wizard logic resolves order). */
+    public void setJunkRange(int startIndex, int endIndex) {
+        this.junkStartIndex = Math.min(startIndex, endIndex);
+        this.junkEndIndex   = Math.max(startIndex, endIndex);
+        invalidate();
+    }
+
+    public void clearJunkRange() {
+        junkStartIndex = -1;
+        junkEndIndex   = -1;
+        invalidate();
+    }
+
+    /** Highlight a single block as the address target. */
+    public void setTargetBlock(int index) {
+        this.targetIndex = index;
+        invalidate();
+    }
+
+    public void clearTargetBlock() {
+        this.targetIndex = -1;
+        invalidate();
+    }
+
+    public void clearSelection() {
+        junkStartIndex = -1;
+        junkEndIndex   = -1;
+        targetIndex    = -1;
+        selectionMode  = SelectionMode.NONE;
+        setClickable(false);
+        invalidate();
+    }
+
+    public int getJunkStartIndex() { return junkStartIndex; }
+    public int getJunkEndIndex()   { return junkEndIndex; }
+    public int getTargetIndex()    { return targetIndex; }
+
+    /** Shake a specific block to indicate an invalid tap. */
+    public void shakeBlock(int blockIndex) {
+        shakeTargetBlock = blockIndex;
+        ValueAnimator anim = ValueAnimator.ofFloat(0f, 18f, -14f, 10f, -6f, 0f);
+        anim.setDuration(300);
+        anim.addUpdateListener(a -> {
+            shakeOffsetX = (float) a.getAnimatedValue();
+            invalidate();
+        });
+        anim.start();
+    }
+
+    // ── Touch handling ────────────────────────────────────────────────────────
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (selectionMode == SelectionMode.NONE) return super.onTouchEvent(event);
+        if (event.getAction() != MotionEvent.ACTION_UP) return true;
+
+        float touchY = event.getY();
+        int tappedBlock = blockIndexFromY(touchY);
+        if (tappedBlock >= 0 && tappedBlock < stack.size() && blockTapListener != null) {
+            blockTapListener.onBlockTapped(tappedBlock);
+        }
+        return true;
+    }
+
+    /** Convert a Y pixel coordinate to a stack block index (0 = top/highest address). */
+    private int blockIndexFromY(float y) {
+        if (stack.isEmpty()) return -1;
+        int w = getWidth();
+        float startX = 140f;
+        float startY = 20f;
+        float blockW = w * 0.55f;
+        float blockH = Math.min(90f, (getHeight() - 40f) / stack.size());
+
+        for (int i = 0; i < stack.size(); i++) {
+            int vizIdx = stack.size() - 1 - i;
+            float top = startY + vizIdx * blockH;
+            if (y >= top && y < top + blockH) return i;
+        }
+        return -1;
+    }
+
+    // ── Measure ───────────────────────────────────────────────────────────────
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int w = MeasureSpec.getSize(widthMeasureSpec);
         int h = MeasureSpec.getSize(heightMeasureSpec);
-        
+
         float density = getResources().getDisplayMetrics().density;
-        // Guarantee at least 60dp per block so text never overlaps
         int minHeight = (int) (60 * density * Math.max(1, stack.size()));
-        
+
         int modeH = MeasureSpec.getMode(heightMeasureSpec);
         int finalH = (modeH == MeasureSpec.EXACTLY) ? h : Math.max(h, minHeight);
-        
+
         setMeasuredDimension(w, finalH);
     }
+
+    // ── Drawing ───────────────────────────────────────────────────────────────
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -127,8 +243,8 @@ public class StackCanvasView extends View {
         float targetEbpY = startY + (stack.size() - 1 - ebpIndex) * blockH + blockH / 2f;
 
         fillHeight = lerp(fillHeight, targetFill, 0.1f);
-        animEspY = lerp(animEspY, targetEspY, 0.15f);
-        animEbpY = lerp(animEbpY, targetEbpY, 0.15f);
+        animEspY   = lerp(animEspY, targetEspY, 0.15f);
+        animEbpY   = lerp(animEbpY, targetEbpY, 0.15f);
 
         // ── Draw stack blocks ─────────────────────────────────────────────────
         for (int i = 0; i < stack.size(); i++) {
@@ -136,33 +252,55 @@ public class StackCanvasView extends View {
             int vizIdx = stack.size() - 1 - i;
             float y = startY + vizIdx * blockH;
 
-            blockPaint.setColor(blockColor(block.type));
+            // Shake offset for invalid-tap feedback
+            float offsetX = (shakeTargetBlock == i) ? shakeOffsetX : 0f;
+
+            // Selection colouring overrides
+            int fillColor  = blockColor(block.type);
+            int strokeColor = borderColor(block.type);
+            if (selectionMode != SelectionMode.NONE) {
+                boolean inJunk = junkStartIndex >= 0 && i >= junkStartIndex && i <= junkEndIndex;
+                boolean isTarget = (targetIndex == i);
+                boolean isFirstTap = (junkStartIndex >= 0 && junkEndIndex < 0 && i == junkStartIndex);
+                if (isTarget) {
+                    fillColor  = Color.argb(200, 31, 111, 235); // accent blue
+                    strokeColor = Color.argb(220, 88, 166, 255);
+                } else if (inJunk) {
+                    fillColor  = Color.argb(190, 180, 50, 30);  // junk red
+                    strokeColor = Color.argb(220, 248, 81, 73);
+                } else if (isFirstTap) {
+                    fillColor  = Color.argb(180, 210, 120, 30); // amber for first tap
+                    strokeColor = Color.argb(220, 240, 160, 60);
+                }
+            }
+
+            blockPaint.setColor(fillColor);
             blockPaint.setStyle(Paint.Style.FILL);
-            canvas.drawRect(startX, y, startX + blockW, y + blockH, blockPaint);
+            canvas.drawRect(startX + offsetX, y, startX + offsetX + blockW, y + blockH, blockPaint);
 
-            borderPaint.setColor(borderColor(block.type));
-            canvas.drawRect(startX, y, startX + blockW, y + blockH, borderPaint);
+            borderPaint.setColor(strokeColor);
+            borderPaint.setStrokeWidth(selectionMode != SelectionMode.NONE ? 3f : 2f);
+            canvas.drawRect(startX + offsetX, y, startX + offsetX + blockW, y + blockH, borderPaint);
 
-            // Address
+            // Address (left of block — not shaken)
             canvas.drawText(block.address, startX - 8f, y + blockH / 2f + 8f, addressPaint);
 
             // Label
-            valuePaint.setColor(Color.parseColor("#C9D1D9"));
-            valuePaint.setTextSize(26f);
-            canvas.drawText(block.label, startX + 12f, y + 32f, labelPaint);
+            labelPaint.setColor(Color.parseColor("#C9D1D9"));
+            canvas.drawText(block.label, startX + offsetX + 12f, y + 32f, labelPaint);
 
             // Value
             valuePaint.setColor(valueColor(block.type));
             valuePaint.setTextSize(28f);
             String val = block.value.replace("\\0", "·");
-            canvas.drawText(val, startX + 12f, y + blockH - 16f, valuePaint);
+            canvas.drawText(val, startX + offsetX + 12f, y + blockH - 16f, valuePaint);
         }
 
-        // ── Fluid simulation ──────────────────────────────────────────────────
-        if (fillHeight > 0.5f) {
+        // ── Fluid simulation (only when NOT in selection mode) ────────────────
+        if (selectionMode == SelectionMode.NONE && fillHeight > 0.5f) {
             List<Integer> buffIndices = new ArrayList<>();
             for (int i = 0; i < stack.size(); i++) {
-                if (stack.get(i).label.startsWith("buff[")) buffIndices.add(i);
+                if (stack.get(i).label.startsWith("buff[") || stack.get(i).label.startsWith("buf[")) buffIndices.add(i);
             }
             if (!buffIndices.isEmpty()) {
                 int minViz = Integer.MAX_VALUE, maxViz = Integer.MIN_VALUE;
@@ -177,21 +315,17 @@ public class StackCanvasView extends View {
                 float fluidTopY = Math.max(bufTopY, bufBotY - fillHeight);
                 boolean isOverflow = fillHeight > totalBufH;
 
-                int colorTop, colorBot;
-                if (isOverflow && !isPatched) {
-                    colorTop = Color.argb(153, 248, 81, 73);
-                    colorBot = Color.argb(51, 248, 81, 73);
-                } else {
-                    colorTop = Color.argb(153, 88, 166, 255);
-                    colorBot = Color.argb(51, 88, 166, 255);
-                }
+                int colorTop = isOverflow && !isPatched
+                        ? Color.argb(153, 248, 81, 73)
+                        : Color.argb(153, 88, 166, 255);
+                int colorBot = isOverflow && !isPatched
+                        ? Color.argb(51, 248, 81, 73)
+                        : Color.argb(51, 88, 166, 255);
 
                 LinearGradient gradient = new LinearGradient(
-                        0, fluidTopY, 0, bufBotY,
-                        colorTop, colorBot, Shader.TileMode.CLAMP);
+                        0, fluidTopY, 0, bufBotY, colorTop, colorBot, Shader.TileMode.CLAMP);
                 fluidPaint.setShader(gradient);
 
-                // Clip to buffer region only
                 canvas.save();
                 canvas.clipRect(startX, startY, startX + blockW, h);
 
@@ -211,13 +345,15 @@ public class StackCanvasView extends View {
             }
         }
 
-        // ── ESP / EBP pointers ────────────────────────────────────────────────
-        drawPointer(canvas, "ESP", animEspY, startX + blockW, Color.parseColor("#58A6FF"), false);
-        if (Math.abs(animEspY - animEbpY) > 5f) {
-            drawPointer(canvas, "EBP", animEbpY, startX + blockW, Color.parseColor("#A371F7"), true);
+        // ── ESP / EBP pointers (only when NOT in selection mode) ──────────────
+        if (selectionMode == SelectionMode.NONE) {
+            drawPointer(canvas, "ESP", animEspY, startX + blockW, Color.parseColor("#58A6FF"), false);
+            if (Math.abs(animEspY - animEbpY) > 5f) {
+                drawPointer(canvas, "EBP", animEbpY, startX + blockW, Color.parseColor("#A371F7"), true);
+            }
         }
 
-        // Continuously animate
+        // Continuously animate (always so selection pulses)
         invalidate();
     }
 
@@ -229,7 +365,6 @@ public class StackCanvasView extends View {
         float boxH = 36f;
         float boxTop = y - boxH / 2f;
 
-        // Arrow
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         p.setColor(color);
         p.setStyle(Paint.Style.FILL);
@@ -242,16 +377,13 @@ public class StackCanvasView extends View {
         arrow.close();
         canvas.drawPath(arrow, p);
 
-        // Label
         pointerPaint.setColor(Color.parseColor("#0D1117"));
         canvas.drawText(name, px + arrowW + boxW / 2f, y + 9f, pointerPaint);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private float lerp(float a, float b, float t) {
-        return a + (b - a) * t;
-    }
+    private float lerp(float a, float b, float t) { return a + (b - a) * t; }
 
     private int blockColor(String type) {
         switch (type) {
@@ -260,22 +392,28 @@ public class StackCanvasView extends View {
             case StackBlock.TYPE_WARN:       return Color.argb(180, 31, 21, 0);
             case StackBlock.TYPE_DANGER:     return Color.argb(200, 31, 13, 13);
             case StackBlock.TYPE_FILLED:     return Color.argb(180, 13, 31, 46);
+            case StackBlock.TYPE_JUNK:       return Color.argb(190, 180, 50, 30);
+            case StackBlock.TYPE_TARGET:     return Color.argb(200, 31, 111, 235);
             default:                         return Color.argb(200, 33, 38, 45);
         }
     }
 
     private int borderColor(String type) {
         switch (type) {
-            case StackBlock.TYPE_DANGER: return Color.argb(153, 248, 81, 73);
+            case StackBlock.TYPE_DANGER:
+            case StackBlock.TYPE_JUNK:   return Color.argb(153, 248, 81, 73);
             case StackBlock.TYPE_WARN:   return Color.argb(153, 210, 153, 34);
+            case StackBlock.TYPE_TARGET: return Color.argb(200, 88, 166, 255);
             default:                     return Color.argb(25, 255, 255, 255);
         }
     }
 
     private int valueColor(String type) {
         switch (type) {
-            case StackBlock.TYPE_DANGER: return Color.parseColor("#FF7B72");
+            case StackBlock.TYPE_DANGER:
+            case StackBlock.TYPE_JUNK:   return Color.parseColor("#FF7B72");
             case StackBlock.TYPE_WARN:   return Color.parseColor("#D29922");
+            case StackBlock.TYPE_TARGET: return Color.parseColor("#79C0FF");
             default:                     return Color.WHITE;
         }
     }

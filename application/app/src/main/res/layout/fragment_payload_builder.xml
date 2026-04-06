@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Payload builder wizard: full-screen DialogFragment -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0D1117">
+
+    <!-- ─── Toolbar ─────────────────────────────────────── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:background="#161B22">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_pb_back"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✕"
+            android:textColor="#8B949E"
+            android:textSize="16sp"/>
+
+        <!-- Step dots: ① ② ③ -->
+        <TextView
+            android:id="@+id/tv_pb_step_dots"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="① ─── ② ─── ③"
+            android:textColor="#8B949E"
+            android:textSize="13sp"
+            android:gravity="center"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_pb_objdump"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="{ } Objdump"
+            android:textSize="11sp"
+            android:textColor="#58A6FF"/>
+    </LinearLayout>
+
+    <!-- ─── Instruction box ──────────────────────────────── -->
+    <TextView
+        android:id="@+id/tv_pb_instruction"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:textColor="#E6EDF3"
+        android:textSize="13sp"
+        android:background="#161B22"
+        android:lineSpacingExtra="4dp"/>
+
+    <!-- ─── Stack canvas (scrollable) ───────────────────── -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <com.example.secviz.ui.views.StackCanvasView
+            android:id="@+id/stack_canvas_pb"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- ─── Payload preview (Step 3 only) ───────────────── -->
+    <ScrollView
+        android:id="@+id/scroll_payload_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="180dp"
+        android:background="#161B22"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_payload_preview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="12dp"
+            android:textColor="#79C0FF"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:lineSpacingExtra="2dp"/>
+    </ScrollView>
+
+    <!-- ─── Navigation bar ──────────────────────────────── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="#161B22"
+        android:gravity="center_vertical">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_pb_prev"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Prev"
+            android:enabled="false"/>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_pb_next"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Next →"
+            android:enabled="false"/>
+    </LinearLayout>
+
+</LinearLayout>

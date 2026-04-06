@@ -7,6 +7,8 @@ public class StackBlock {
     public static final String TYPE_DANGER = "danger";
     public static final String TYPE_NEUTRAL = "neutral";
     public static final String TYPE_FILLED = "filled";
+    public static final String TYPE_JUNK   = "junk";    // payload builder: junk fill (red)
+    public static final String TYPE_TARGET = "target";  // payload builder: address destination (blue)
 
     public String label;
     public String address;

@@ -55,6 +55,18 @@
                 android:text="@string/peek_assembly"
                 android:textSize="12sp"/>
 
+            <!-- Objdump viewer — shown only for Level 2B -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_objdump"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="{ } Objdump"
+                android:textSize="11sp"
+                android:textColor="@color/accent"
+                android:visibility="gone"/>
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_menu"
                 style="@style/Widget.Material3.Button.TextButton"
@@ -68,6 +80,7 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"/>
         </LinearLayout>
+
 
         <!-- Code viewer -->
         <androidx.cardview.widget.CardView

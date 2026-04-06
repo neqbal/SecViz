@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Objdump full-screen viewer -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0D1117">
+
+    <!-- Toolbar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:background="#161B22">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="{ } Objdump Viewer"
+            android:textColor="#58A6FF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_objdump_close"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✕ Close"
+            android:textColor="#8B949E"
+            android:textSize="12sp"/>
+    </LinearLayout>
+
+    <!-- Column hint -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="  Tip: long-press an address to copy it"
+        android:textColor="#3FB950"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:padding="8dp"
+        android:background="#0D1117"/>
+
+    <!-- Disassembly lines -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_objdump"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="12dp"
+        android:clipToPadding="false"/>
+
+</LinearLayout>

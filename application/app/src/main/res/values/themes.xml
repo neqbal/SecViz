@@ -13,4 +13,12 @@
         <item name="android:navigationBarColor">@color/bg_primary</item>
         <item name="android:fontFamily">sans-serif</item>
     </style>
+
+    <!-- Dark dialog for address input and other in-level dialogs -->
+    <style name="Theme.SecViz.Dialog" parent="Theme.Material3.Dark.Dialog">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorSurface">@color/bg_elevated</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:windowBackground">@color/bg_elevated</item>
+    </style>
 </resources>

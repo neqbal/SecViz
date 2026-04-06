@@ -16,6 +16,7 @@ import android.widget.TextView;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.fragment.app.Fragment;
@@ -30,6 +31,10 @@ import com.example.secviz.ui.adapters.CodeLineAdapter;
 import com.example.secviz.ui.adapters.ConsoleAdapter;
 import com.example.secviz.ui.adapters.HexDumpAdapter;
 import com.example.secviz.ui.adapters.RegisterTimelineAdapter;
+import com.example.secviz.ui.dialogs.ObjdumpViewerFragment;
+import com.example.secviz.ui.dialogs.PayloadBuilderFragment;
+import com.example.secviz.ui.dialogs.RopEditorFragment;
+import com.example.secviz.ui.dialogs.RopScannerFragment;
 import com.example.secviz.ui.sheets.AssemblyBottomSheet;
 import com.example.secviz.ui.views.StackCanvasView;
 import com.example.secviz.viewmodel.LevelViewModel;
@@ -336,7 +341,68 @@ public class LevelFragment extends Fragment {
             AssemblyBottomSheet.newInstance(level.code.get(lineIdx), rsp, rbp)
                     .show(getChildFragmentManager(), "asm");
         });
+
+        // ── Level 2B: Objdump button + gets() observer ─────────────────────────
+        MaterialButton btnObjdump = root.findViewById(R.id.btn_objdump);
+        if ("2b".equals(level.id) && level.objdump != null) {
+            btnObjdump.setVisibility(View.VISIBLE);
+            btnObjdump.setOnClickListener(v ->
+                    ObjdumpViewerFragment.newInstance(level.objdump)
+                            .show(getChildFragmentManager(), "objdump"));
+        } else {
+            btnObjdump.setVisibility(View.GONE);
+        }
+
+        viewModel.getsReached.observe(getViewLifecycleOwner(), reached -> {
+            if (!Boolean.TRUE.equals(reached)) return;
+            showGetsTriggerDialog();
+        });
     }
+
+    /**
+     * Shows the 'Generate Payload / Enter Normal Value' dialog when gets() is reached.
+     * For Level 3 the positive button opens the ROP Editor.
+     * For Level 2B it opens the Payload Builder wizard.
+     */
+    private void showGetsTriggerDialog() {
+        boolean isLevel3 = "3".equals(level.id);
+
+        String positiveLabel = isLevel3 ? "Open ROP Editor" : "Generate Payload";
+        String message = isLevel3
+                ? "gets() is blocking. You can:\n• Send a normal string (it returns safely)\n" +
+                  "• Use the NX Demo preset (shellcode → SIGSEGV)\n" +
+                  "• Open the ROP Editor to build your chain"
+                : "The program is waiting on stdin. How do you want to respond?";
+
+        new androidx.appcompat.app.AlertDialog.Builder(requireContext(), R.style.Theme_SecViz_Dialog)
+                .setTitle("🔴  gets() reached")
+                .setMessage(message)
+                .setCancelable(false)
+                .setNegativeButton("Normal Value", (dlg, w) -> {
+                    viewModel.consumeGetsReached();
+                    layoutInput.setVisibility(View.VISIBLE);
+                    btnNextStep.setEnabled(false);
+                })
+                .setPositiveButton(positiveLabel, (dlg, w) -> {
+                    if (isLevel3) {
+                        RopEditorFragment editor = RopEditorFragment.newInstance(level.ropGadgets);
+                        editor.setOnRopPayloadReady(payload -> viewModel.submitRopPayload(payload));
+                        editor.show(getChildFragmentManager(), "rop_editor");
+                    } else {
+                        List<StackBlock> currentStack = viewModel.getStack();
+                        if (currentStack == null) return;
+                        PayloadBuilderFragment builder = PayloadBuilderFragment.newInstance(
+                                currentStack, level.objdump != null ? level.objdump : "");
+                        builder.setOnPayloadReady((junkStart, junkEnd, targetIdx, address) ->
+                                viewModel.submitPayload(junkStart, junkEnd, targetIdx, address));
+                        builder.setOnNormalInputRequested(() ->
+                                layoutInput.setVisibility(View.VISIBLE));
+                        builder.show(getChildFragmentManager(), "payload_builder");
+                    }
+                })
+                .show();
+    }
+
 
     private void submitInput() {
         if (etInput == null) return;

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Address input dialog shown when user taps the target stack block -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#1C2128">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Enter win() address"
+        android:textColor="#C9D1D9"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:paddingBottom="4dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Find &lt;win&gt; in the objdump, copy the address here."
+        android:textColor="#8B949E"
+        android:textSize="12sp"
+        android:paddingBottom="12dp"/>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/til_address"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+        android:hint="e.g. 0x400476">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/et_address"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:fontFamily="monospace"
+            android:textColor="#C9D1D9"
+            android:textColorHint="#8B949E"
+            android:imeOptions="actionDone"
+            android:maxLines="1"/>
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Live LE byte preview -->
+    <TextView
+        android:id="@+id/tv_le_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Little-endian: —"
+        android:textColor="#58A6FF"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:paddingTop="6dp"/>
+
+</LinearLayout>
