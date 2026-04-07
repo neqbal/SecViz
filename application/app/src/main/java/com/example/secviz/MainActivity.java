@@ -3,6 +3,8 @@ package com.example.secviz;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -17,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.secviz.data.Level;
 import com.example.secviz.data.LevelsRepository;
+import com.example.secviz.ui.HomeFragment;
 import com.example.secviz.ui.LevelFragment;
 import com.google.android.material.appbar.MaterialToolbar;
 
@@ -28,6 +31,8 @@ public class MainActivity extends AppCompatActivity {
     private int currentLevelIdx = 0;
     private DrawerLayout drawerLayout;
     private LevelsAdapter drawerAdapter;
+    private ActionBarDrawerToggle toggle;
+    private boolean isOnHome = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,24 +43,49 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         drawerLayout = findViewById(R.id.main_drawer_layout);
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawerLayout, toolbar,
+        toggle = new ActionBarDrawerToggle(this, drawerLayout, toolbar,
                 R.string.drawer_open, R.string.drawer_close);
         drawerLayout.addDrawerListener(toggle);
         toggle.syncState();
 
         levels = LevelsRepository.getLevels();
-        
+
         RecyclerView rvLevels = findViewById(R.id.rv_levels);
         rvLevels.setLayoutManager(new LinearLayoutManager(this));
         drawerAdapter = new LevelsAdapter();
         rvLevels.setAdapter(drawerAdapter);
 
+        showHome();
+    }
+
+    private void showHome() {
+        isOnHome = true;
+        // Lock the drawer and hide the hamburger icon on the home screen
+        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+        toggle.setDrawerIndicatorEnabled(false);
+        toggle.syncState();
+
+        HomeFragment homeFragment = HomeFragment.newInstance(this::startBinaryExploitation);
+        getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, homeFragment)
+                .commit();
+        invalidateOptionsMenu();
+    }
+
+    private void startBinaryExploitation() {
         loadLevel(0);
     }
 
     private void loadLevel(int idx) {
         if (idx >= levels.size()) idx = levels.size() - 1;
         currentLevelIdx = idx;
+        isOnHome = false;
+        // Unlock drawer and show hamburger icon when inside a level
+        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED);
+        toggle.setDrawerIndicatorEnabled(true);
+        toggle.syncState();
+        invalidateOptionsMenu();
         Level level = levels.get(currentLevelIdx);
 
         if (drawerAdapter != null) {
@@ -77,9 +107,37 @@ public class MainActivity extends AppCompatActivity {
     public void onBackPressed() {
         if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START);
+        } else if (!isOnHome) {
+            // Navigate back to home instead of exiting the app
+            showHome();
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_level, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        // Show the home icon only when inside a level, not on the home screen
+        MenuItem homeItem = menu.findItem(R.id.action_home);
+        if (homeItem != null) {
+            homeItem.setVisible(!isOnHome);
+        }
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.action_home) {
+            showHome();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private class LevelsAdapter extends RecyclerView.Adapter<LevelsAdapter.LevelViewHolder> {
