@@ -505,14 +505,12 @@ public class LevelViewModel extends ViewModel {
         }
     }
 
-    /** Step 0: Program ready — show main() start */
+    /** Step 0: Program ready — main() is already shown on load, jump straight to step 1. */
     private void step2b_0() {
-        int mainIdx = findInCode("int main() {", 0);
-        _activeLineIndex.setValue(mainIdx >= 0 ? mainIdx : level.startCodeLine);
-        _statusTitle.setValue("Program Ready");
-        _statusDesc.setValue("main() starts. Call stack is empty.");
-        _step.setValue(1f);
-        recordSnapshot("main() entry", "main");
+        // main() is already highlighted by reset() via level.startCodeLine.
+        // Calling step2b_1() directly means the FIRST Next Step press shows
+        // "call vuln" instead of redundantly re-highlighting main().
+        step2b_1();
     }
 
     /** Step 1: call vuln — push return address */
@@ -790,17 +788,13 @@ public class LevelViewModel extends ViewModel {
         }
     }
 
-    /** Stage 0: intro — explain NX is enabled */
+    /** Stage 0: intro — main() already shown on load; jump to callVuln on first press */
     private void step3_intro() {
-        _activeLineIndex.setValue(findInCode("int main() {", 0));
-        _statusTitle.setValue("NX Enabled — No Shellcode");
-        _statusDesc.setValue("This binary has NX (Non-eXecute) set. The stack is not executable. " +
-                "Sending shellcode will cause a SIGSEGV because the CPU refuses to run stack bytes. " +
-                "Try the NX Demo preset to see it crash, then use the ROP Editor to build a chain.");
-        _statusType.setValue("warn");
-        _step.setValue(1f);
-        recordSnapshot("main() — NX active", "main");
+        // reset() already highlights main() via level.startCodeLine = 16.
+        // Delegate so the FIRST Next Step press is meaningful (call vuln).
+        step3_callVuln();
     }
+
 
     /** Stage 1: call vuln() — push return address */
     private void step3_callVuln() {
