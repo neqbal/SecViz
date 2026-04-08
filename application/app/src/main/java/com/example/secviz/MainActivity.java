@@ -34,6 +34,11 @@ public class MainActivity extends AppCompatActivity {
     private ActionBarDrawerToggle toggle;
     private boolean isOnHome = true;
 
+    private MenuItem timerMenuItem;
+    private android.os.Handler timerHandler;
+    private Runnable timerRunnable;
+    private long timerStartMs = 0;
+    private boolean timerRunning = false;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -60,6 +65,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showHome() {
         isOnHome = true;
+        stopTimer();
+        invalidateOptionsMenu();
         // Lock the drawer and hide the hamburger icon on the home screen
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
         toggle.setDrawerIndicatorEnabled(false);
@@ -81,16 +88,16 @@ public class MainActivity extends AppCompatActivity {
         if (idx >= levels.size()) idx = levels.size() - 1;
         currentLevelIdx = idx;
         isOnHome = false;
-        // Unlock drawer and show hamburger icon when inside a level
+
+        resetTimer(); // resets and restarts for each level
+
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED);
         toggle.setDrawerIndicatorEnabled(true);
         toggle.syncState();
         invalidateOptionsMenu();
-        Level level = levels.get(currentLevelIdx);
 
-        if (drawerAdapter != null) {
-            drawerAdapter.notifyDataSetChanged();
-        }
+        Level level = levels.get(currentLevelIdx);
+        if (drawerAdapter != null) drawerAdapter.notifyDataSetChanged();
 
         final int nextIdx = currentLevelIdx + 1;
         LevelFragment fragment = LevelFragment.newInstance(level, () -> {
@@ -118,6 +125,16 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_level, menu);
+
+        timerMenuItem = menu.findItem(R.id.action_timer);
+        TextView timerView = (TextView) timerMenuItem.getActionView();
+        timerView.setTextColor(0xFFC9D1D9);
+        timerView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+        timerView.setTypeface(android.graphics.Typeface.MONOSPACE);
+        timerView.setPadding(0, 0, 16, 0);
+        timerView.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        timerView.setText("00:00");
+
         return true;
     }
 
@@ -125,9 +142,11 @@ public class MainActivity extends AppCompatActivity {
     public boolean onPrepareOptionsMenu(Menu menu) {
         // Show the home icon only when inside a level, not on the home screen
         MenuItem homeItem = menu.findItem(R.id.action_home);
+        MenuItem timerItem = menu.findItem(R.id.action_timer);
         if (homeItem != null) {
             homeItem.setVisible(!isOnHome);
         }
+        if (timerItem != null) timerItem.setVisible(!isOnHome);
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -139,7 +158,41 @@ public class MainActivity extends AppCompatActivity {
         }
         return super.onOptionsItemSelected(item);
     }
+    private void startTimer() {
+        if (timerHandler == null) timerHandler = new android.os.Handler(getMainLooper());
+        timerStartMs = System.currentTimeMillis();
+        timerRunning = true;
 
+        timerRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!timerRunning || timerMenuItem == null) return;
+                long elapsed = System.currentTimeMillis() - timerStartMs;
+                long minutes = (elapsed / 60000) % 60;
+                long seconds = (elapsed / 1000)  % 60;
+                TextView tv = (TextView) timerMenuItem.getActionView();
+                if (tv != null) tv.setText(String.format("%02d:%02d", minutes, seconds));
+                timerHandler.postDelayed(this, 1000);
+            }
+        };
+        timerHandler.post(timerRunnable);
+    }
+
+    private void stopTimer() {
+        timerRunning = false;
+        if (timerHandler != null && timerRunnable != null) {
+            timerHandler.removeCallbacks(timerRunnable);
+        }
+    }
+
+    private void resetTimer() {
+        stopTimer();
+        if (timerMenuItem != null) {
+            TextView tv = (TextView) timerMenuItem.getActionView();
+            if (tv != null) tv.setText("00:00");
+        }
+        startTimer();
+    }
     private class LevelsAdapter extends RecyclerView.Adapter<LevelsAdapter.LevelViewHolder> {
 
         @NonNull

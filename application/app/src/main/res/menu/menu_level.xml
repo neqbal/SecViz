@@ -3,9 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_timer"
+        android:title="Timer"
+        app:showAsAction="always"
+        app:actionViewClass="android.widget.TextView"/>
+
+    <item
         android:id="@+id/action_home"
         android:icon="@drawable/ic_home"
         android:title="Home"
         app:showAsAction="always"/>
-
 </menu>

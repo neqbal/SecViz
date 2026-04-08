@@ -26,17 +26,14 @@ import java.util.List;
 
 public class HexDumpAdapter extends RecyclerView.Adapter<HexDumpAdapter.VH> {
 
-    // One row = 16 bytes,  8 bytes per half
     public static final int BYTES_PER_ROW = 16;
 
-    /** Status of each byte cell */
     public enum ByteStatus { EMPTY, FILLED, OVERFLOW }
 
-    /** Data model for one row in the hex dump */
     public static class HexRow {
         public final String address;
-        public final byte[] bytes;        // exactly BYTES_PER_ROW entries
-        public final ByteStatus[] status; // parallel array
+        public final byte[] bytes;
+        public final ByteStatus[] status;
 
         public HexRow(String address, byte[] bytes, ByteStatus[] status) {
             this.address = address;
@@ -46,10 +43,49 @@ public class HexDumpAdapter extends RecyclerView.Adapter<HexDumpAdapter.VH> {
     }
 
     private List<HexRow> rows = new ArrayList<>();
+    private final java.util.Set<Integer> rowsToFlash = new java.util.HashSet<>();
 
     public void submitRows(List<HexRow> newRows) {
-        this.rows = newRows;
-        notifyDataSetChanged();
+        DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override public int getOldListSize() { return rows.size(); }
+            @Override public int getNewListSize() { return newRows.size(); }
+
+            @Override
+            public boolean areItemsTheSame(int oldPos, int newPos) {
+                return rows.get(oldPos).address.equals(newRows.get(newPos).address);
+            }
+
+            @Override
+            public boolean areContentsTheSame(int oldPos, int newPos) {
+                HexRow oldRow = rows.get(oldPos);
+                HexRow newRow = newRows.get(newPos);
+                return java.util.Arrays.equals(oldRow.status, newRow.status)
+                        && java.util.Arrays.equals(oldRow.bytes,  newRow.bytes);
+            }
+        });
+
+        // Mark only changed rows for flashing
+        rowsToFlash.clear();
+        for (int i = 0; i < newRows.size(); i++) {
+            boolean hasData = false;
+            for (ByteStatus st : newRows.get(i).status) {
+                if (st != ByteStatus.EMPTY) { hasData = true; break; }
+            }
+            if (!hasData) continue;
+
+            // Flash only if this row didn't exist before or its content changed
+            if (i >= rows.size()) {
+                rowsToFlash.add(i);
+            } else {
+                if (!java.util.Arrays.equals(rows.get(i).bytes,  newRows.get(i).bytes)
+                        || !java.util.Arrays.equals(rows.get(i).status, newRows.get(i).status)) {
+                    rowsToFlash.add(i);
+                }
+            }
+        }
+
+        rows = newRows;
+        diff.dispatchUpdatesTo(this);
     }
 
     @NonNull
@@ -62,17 +98,17 @@ public class HexDumpAdapter extends RecyclerView.Adapter<HexDumpAdapter.VH> {
 
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
-        bind(holder, rows.get(position));
+        bind(holder, rows.get(position), position);
     }
 
     @Override
     public int getItemCount() { return rows.size(); }
 
-    private void bind(VH holder, HexRow row) {
+    private void bind(VH holder, HexRow row, int position) {
         Context ctx = holder.itemView.getContext();
         holder.tvAddress.setText(row.address);
 
-        SpannableStringBuilder hexSb = new SpannableStringBuilder();
+        SpannableStringBuilder hexSb   = new SpannableStringBuilder();
         SpannableStringBuilder asciiSb = new SpannableStringBuilder();
 
         int colorFilled   = ContextCompat.getColor(ctx, R.color.success);
@@ -83,22 +119,18 @@ public class HexDumpAdapter extends RecyclerView.Adapter<HexDumpAdapter.VH> {
             ByteStatus st = row.status[i];
             byte b = row.bytes[i];
 
-            // ── Hex section ──────────────────────────────────────────────────
-            String hexStr = st == ByteStatus.EMPTY ? "  " : String.format("%02X", b & 0xFF);
-            int hexStart = hexSb.length();
+            String hexStr  = st == ByteStatus.EMPTY ? "  " : String.format("%02X", b & 0xFF);
+            int hexStart   = hexSb.length();
             hexSb.append(hexStr);
-            int hexEnd = hexSb.length();
+            int hexEnd     = hexSb.length();
 
             int hexColor = st == ByteStatus.OVERFLOW ? colorOverflow
                     : st == ByteStatus.FILLED ? colorFilled
                     : colorEmpty;
             hexSb.setSpan(new ForegroundColorSpan(hexColor),
                     hexStart, hexEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-            // Group separator: space between each byte, wider gap in the middle
             hexSb.append(i == 7 ? "  " : " ");
 
-            // ── ASCII section ─────────────────────────────────────────────────
             char c = (st == ByteStatus.EMPTY) ? '.'
                     : (b >= 32 && b < 127) ? (char) b : '.';
             int asciiStart = asciiSb.length();
@@ -110,10 +142,13 @@ public class HexDumpAdapter extends RecyclerView.Adapter<HexDumpAdapter.VH> {
         holder.tvHex.setText(hexSb);
         holder.tvAscii.setText(asciiSb);
 
-        // Flash animation when the row has any filled/overflow bytes
-        boolean hasData = false;
-        for (ByteStatus st : row.status) if (st != ByteStatus.EMPTY) { hasData = true; break; }
-        if (hasData) flashRow(holder.itemView, ctx);
+        // Only flash rows that actually changed since last submitRows()
+        if (rowsToFlash.contains(position)) {
+            flashRow(holder.itemView, ctx);
+            rowsToFlash.remove(position);
+        } else {
+            holder.itemView.setBackgroundColor(Color.TRANSPARENT);
+        }
     }
 
     private void flashRow(View view, Context ctx) {

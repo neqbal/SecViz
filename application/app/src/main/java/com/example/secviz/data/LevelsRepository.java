@@ -61,7 +61,143 @@ public class LevelsRepository {
         List<String[]> presets1 = new ArrayList<>();
         presets1.add(new String[]{"Safe", "Hello!"});
         presets1.add(new String[]{"Crash", "AAAAAAAAAAAAAAAA++++++++BBBBBBBB"});
-
+        String objdump1 =
+                "vuln:     file format elf64-x86-64\n" +
+                        "\n" +
+                        "\n" +
+                        "Disassembly of section .init:\n" +
+                        "\n" +
+                        "000000000040033c <_init>:\n" +
+                        "  40033c:       f3 0f 1e fa             endbr64\n" +
+                        "  400340:       48 83 ec 08             sub    rsp,0x8\n" +
+                        "  400344:       48 8b 05 95 2c 00 00    mov    rax,QWORD PTR [rip+0x2c95]        # 402fe0 <__gmon_start__@Base>\n" +
+                        "  40034b:       48 85 c0                test   rax,rax\n" +
+                        "  40034e:       74 02                   je     400352 <_init+0x16>\n" +
+                        "  400350:       ff d0                   call   rax\n" +
+                        "  400352:       48 83 c4 08             add    rsp,0x8\n" +
+                        "  400356:       c3                      ret\n" +
+                        "\n" +
+                        "Disassembly of section .plt:\n" +
+                        "\n" +
+                        "0000000000400360 <read@plt-0x10>:\n" +
+                        "  400360:       ff 35 8a 2c 00 00       push   QWORD PTR [rip+0x2c8a]        # 402ff0 <_GLOBAL_OFFSET_TABLE_+0x8>\n" +
+                        "  400366:       ff 25 8c 2c 00 00       jmp    QWORD PTR [rip+0x2c8c]        # 402ff8 <_GLOBAL_OFFSET_TABLE_+0x10>\n" +
+                        "  40036c:       0f 1f 40 00             nop    DWORD PTR [rax+0x0]\n" +
+                        "\n" +
+                        "0000000000400370 <read@plt>:\n" +
+                        "  400370:       ff 25 8a 2c 00 00       jmp    QWORD PTR [rip+0x2c8a]        # 403000 <read@GLIBC_2.2.5>\n" +
+                        "  400376:       68 00 00 00 00          push   0x0\n" +
+                        "  40037b:       e9 e0 ff ff ff          jmp    400360 <_init+0x24>\n" +
+                        "\n" +
+                        "Disassembly of section .text:\n" +
+                        "\n" +
+                        "0000000000400380 <_start>:\n" +
+                        "  400380:       f3 0f 1e fa             endbr64\n" +
+                        "  400384:       31 ed                   xor    ebp,ebp\n" +
+                        "  400386:       49 89 d1                mov    r9,rdx\n" +
+                        "  400389:       5e                      pop    rsi\n" +
+                        "  40038a:       48 89 e2                mov    rdx,rsp\n" +
+                        "  40038d:       48 83 e4 f0             and    rsp,0xfffffffffffffff0\n" +
+                        "  400391:       50                      push   rax\n" +
+                        "  400392:       54                      push   rsp\n" +
+                        "  400393:       45 31 c0                xor    r8d,r8d\n" +
+                        "  400396:       31 c9                   xor    ecx,ecx\n" +
+                        "  400398:       48 c7 c7 87 04 40 00    mov    rdi,0x400487\n" +
+                        "  40039f:       ff 15 33 2c 00 00       call   QWORD PTR [rip+0x2c33]        # 402fd8 <__libc_start_main@GLIBC_2.34>\n" +
+                        "  4003a5:       f4                      hlt\n" +
+                        "  4003a6:       66 2e 0f 1f 84 00 00    cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  4003ad:       00 00 00\n" +
+                        "\n" +
+                        "00000000004003b0 <_dl_relocate_static_pie>:\n" +
+                        "  4003b0:       f3 0f 1e fa             endbr64\n" +
+                        "  4003b4:       c3                      ret\n" +
+                        "  4003b5:       66 2e 0f 1f 84 00 00    cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  4003bc:       00 00 00\n" +
+                        "  4003bf:       90                      nop\n" +
+                        "\n" +
+                        "00000000004003c0 <deregister_tm_clones>:\n" +
+                        "  4003c0:       b8 10 30 40 00          mov    eax,0x403010\n" +
+                        "  4003c5:       48 3d 10 30 40 00       cmp    rax,0x403010\n" +
+                        "  4003cb:       74 13                   je     4003e0 <deregister_tm_clones+0x20>\n" +
+                        "  4003cd:       b8 00 00 00 00          mov    eax,0x0\n" +
+                        "  4003d2:       48 85 c0                test   rax,rax\n" +
+                        "  4003d5:       74 09                   je     4003e0 <deregister_tm_clones+0x20>\n" +
+                        "  4003d7:       bf 10 30 40 00          mov    edi,0x403010\n" +
+                        "  4003dc:       ff e0                   jmp    rax\n" +
+                        "  4003de:       66 90                   xchg   ax,ax\n" +
+                        "  4003e0:       c3                      ret\n" +
+                        "  4003e1:       0f 1f 40 00             nop    DWORD PTR [rax+0x0]\n" +
+                        "  4003e5:       66 66 2e 0f 1f 84 00    data16 cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  4003ec:       00 00 00 00\n" +
+                        "\n" +
+                        "00000000004003f0 <register_tm_clones>:\n" +
+                        "  4003f0:       be 10 30 40 00          mov    esi,0x403010\n" +
+                        "  4003f5:       48 81 ee 10 30 40 00    sub    rsi,0x403010\n" +
+                        "  4003fc:       48 89 f0                mov    rax,rsi\n" +
+                        "  4003ff:       48 c1 ee 3f             shr    rsi,0x3f\n" +
+                        "  400403:       48 c1 f8 03             sar    rax,0x3\n" +
+                        "  400407:       48 01 c6                add    rsi,rax\n" +
+                        "  40040a:       48 d1 fe                sar    rsi,1\n" +
+                        "  40040d:       74 11                   je     400420 <register_tm_clones+0x30>\n" +
+                        "  40040f:       b8 00 00 00 00          mov    eax,0x0\n" +
+                        "  400414:       48 85 c0                test   rax,rax\n" +
+                        "  400417:       74 07                   je     400420 <register_tm_clones+0x30>\n" +
+                        "  400419:       bf 10 30 40 00          mov    edi,0x403010\n" +
+                        "  40041e:       ff e0                   jmp    rax\n" +
+                        "  400420:       c3                      ret\n" +
+                        "  400421:       0f 1f 40 00             nop    DWORD PTR [rax+0x0]\n" +
+                        "  400425:       66 66 2e 0f 1f 84 00    data16 cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  40042c:       00 00 00 00\n" +
+                        "\n" +
+                        "0000000000400430 <__do_global_dtors_aux>:\n" +
+                        "  400430:       f3 0f 1e fa             endbr64\n" +
+                        "  400434:       80 3d d1 2b 00 00 00    cmp    BYTE PTR [rip+0x2bd1],0x0        # 40300c <completed.0>\n" +
+                        "  40043b:       75 13                   jne    400450 <__do_global_dtors_aux+0x20>\n" +
+                        "  40043d:       55                      push   rbp\n" +
+                        "  40043e:       48 89 e5                mov    rbp,rsp\n" +
+                        "  400441:       e8 7a ff ff ff          call   4003c0 <deregister_tm_clones>\n" +
+                        "  400446:       c6 05 bf 2b 00 00 01    mov    BYTE PTR [rip+0x2bbf],0x1        # 40300c <completed.0>\n" +
+                        "  40044d:       5d                      pop    rbp\n" +
+                        "  40044e:       c3                      ret\n" +
+                        "  40044f:       90                      nop\n" +
+                        "  400450:       c3                      ret\n" +
+                        "  400451:       0f 1f 40 00             nop    DWORD PTR [rax+0x0]\n" +
+                        "  400455:       66 66 2e 0f 1f 84 00    data16 cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  40045c:       00 00 00 00\n" +
+                        "\n" +
+                        "0000000000400460 <frame_dummy>:\n" +
+                        "  400460:       f3 0f 1e fa             endbr64\n" +
+                        "  400464:       eb 8a                   jmp    4003f0 <register_tm_clones>\n" +
+                        "\n" +
+                        "0000000000400466 <vuln>:\n" +
+                        "  400466:       55                      push   rbp\n" +
+                        "  400467:       48 89 e5                mov    rbp,rsp\n" +
+                        "  40046a:       48 83 ec 10             sub    rsp,0x10\n" +
+                        "  40046e:       48 8d 45 f0             lea    rax,[rbp-0x10]\n" +
+                        "  400472:       ba 64 00 00 00          mov    edx,0x64\n" +
+                        "  400477:       48 89 c6                mov    rsi,rax\n" +
+                        "  40047a:       bf 01 00 00 00          mov    edi,0x1\n" +
+                        "  40047f:       e8 ec fe ff ff          call   400370 <read@plt>\n" +
+                        "  400484:       90                      nop\n" +
+                        "  400485:       c9                      leave\n" +
+                        "  400486:       c3                      ret\n" +
+                        "\n" +
+                        "0000000000400487 <main>:\n" +
+                        "  400487:       55                      push   rbp\n" +
+                        "  400488:       48 89 e5                mov    rbp,rsp\n" +
+                        "  40048b:       b8 00 00 00 00          mov    eax,0x0\n" +
+                        "  400490:       e8 d1 ff ff ff          call   400466 <vuln>\n" +
+                        "  400495:       b8 00 00 00 00          mov    eax,0x0\n" +
+                        "  40049a:       5d                      pop    rbp\n" +
+                        "  40049b:       c3                      ret\n" +
+                        "\n" +
+                        "Disassembly of section .fini:\n" +
+                        "\n" +
+                        "000000000040049c <_fini>:\n" +
+                        "  40049c:       f3 0f 1e fa             endbr64\n" +
+                        "  4004a0:       48 83 ec 08             sub    rsp,0x8\n" +
+                        "  4004a4:       48 83 c4 08             add    rsp,0x8\n" +
+                        "  4004a8:       c3                      ret\n";
         levels.add(new Level(
                 "1", "Level 1: The Crash", "Can you trigger a Segmentation Fault?",
                 "CRASH",
@@ -70,7 +206,8 @@ public class LevelsRepository {
                 6, code1, stack1, presets1,
                 new DefensePatch(
                         "    read(1, buff, 100); // User inputs > 24 bytes to crash",
-                        "    read(1, buff, 16); // Safely read only 16 bytes max!")));
+                        "    read(1, buff, 16); // Safely read only 16 bytes max!"),
+                objdump1));
 
         // ── LEVEL 2A: Leaking Secrets ────────────────────────────────────────
         List<CodeLine> code2a = new ArrayList<>();
@@ -131,6 +268,167 @@ public class LevelsRepository {
         presets2a.add(new String[]{"Safe", "Hi!"});
         presets2a.add(new String[]{"Leak Secret", "AAAAAAAAAAAAAAAA"});
 
+        String objdump2a =
+                "vuln:     file format elf64-x86-64\n" +
+                        "\n" +
+                        "\n" +
+                        "Disassembly of section .init:\n" +
+                        "\n" +
+                        "000000000040033c <_init>:\n" +
+                        "  40033c:       f3 0f 1e fa             endbr64\n" +
+                        "  400340:       48 83 ec 08             sub    rsp,0x8\n" +
+                        "  400344:       48 8b 05 95 2c 00 00    mov    rax,QWORD PTR [rip+0x2c95]        # 402fe0 <__gmon_start__@Base>\n" +
+                        "  40034b:       48 85 c0                test   rax,rax\n" +
+                        "  40034e:       74 02                   je     400352 <_init+0x16>\n" +
+                        "  400350:       ff d0                   call   rax\n" +
+                        "  400352:       48 83 c4 08             add    rsp,0x8\n" +
+                        "  400356:       c3                      ret\n" +
+                        "\n" +
+                        "Disassembly of section .plt:\n" +
+                        "\n" +
+                        "0000000000400360 <puts@plt-0x10>:\n" +
+                        "  400360:       ff 35 8a 2c 00 00       push   QWORD PTR [rip+0x2c8a]        # 402ff0 <_GLOBAL_OFFSET_TABLE_+0x8>\n" +
+                        "  400366:       ff 25 8c 2c 00 00       jmp    QWORD PTR [rip+0x2c8c]        # 402ff8 <_GLOBAL_OFFSET_TABLE_+0x10>\n" +
+                        "  40036c:       0f 1f 40 00             nop    DWORD PTR [rax+0x0]\n" +
+                        "\n" +
+                        "0000000000400370 <puts@plt>:\n" +
+                        "  400370:       ff 25 8a 2c 00 00       jmp    QWORD PTR [rip+0x2c8a]        # 403000 <puts@GLIBC_2.2.5>\n" +
+                        "  400376:       68 00 00 00 00          push   0x0\n" +
+                        "  40037b:       e9 e0 ff ff ff          jmp    400360 <_init+0x24>\n" +
+                        "\n" +
+                        "0000000000400380 <printf@plt>:\n" +
+                        "  400380:       ff 25 82 2c 00 00       jmp    QWORD PTR [rip+0x2c82]        # 403008 <printf@GLIBC_2.2.5>\n" +
+                        "  400386:       68 01 00 00 00          push   0x1\n" +
+                        "  40038b:       e9 d0 ff ff ff          jmp    400360 <_init+0x24>\n" +
+                        "\n" +
+                        "0000000000400390 <read@plt>:\n" +
+                        "  400390:       ff 25 7a 2c 00 00       jmp    QWORD PTR [rip+0x2c7a]        # 403010 <read@GLIBC_2.2.5>\n" +
+                        "  400396:       68 02 00 00 00          push   0x2\n" +
+                        "  40039b:       e9 c0 ff ff ff          jmp    400360 <_init+0x24>\n" +
+                        "\n" +
+                        "Disassembly of section .text:\n" +
+                        "\n" +
+                        "00000000004003a0 <_start>:\n" +
+                        "  4003a0:       f3 0f 1e fa             endbr64\n" +
+                        "  4003a4:       31 ed                   xor    ebp,ebp\n" +
+                        "  4003a6:       49 89 d1                mov    r9,rdx\n" +
+                        "  4003a9:       5e                      pop    rsi\n" +
+                        "  4003aa:       48 89 e2                mov    rdx,rsp\n" +
+                        "  4003ad:       48 83 e4 f0             and    rsp,0xfffffffffffffff0\n" +
+                        "  4003b1:       50                      push   rax\n" +
+                        "  4003b2:       54                      push   rsp\n" +
+                        "  4003b3:       45 31 c0                xor    r8d,r8d\n" +
+                        "  4003b6:       31 c9                   xor    ecx,ecx\n" +
+                        "  4003b8:       48 c7 c7 e3 04 40 00    mov    rdi,0x4004e3\n" +
+                        "  4003bf:       ff 15 13 2c 00 00       call   QWORD PTR [rip+0x2c13]        # 402fd8 <__libc_start_main@GLIBC_2.34>\n" +
+                        "  4003c5:       f4                      hlt\n" +
+                        "  4003c6:       66 2e 0f 1f 84 00 00    cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  4003cd:       00 00 00\n" +
+                        "\n" +
+                        "00000000004003d0 <_dl_relocate_static_pie>:\n" +
+                        "  4003d0:       f3 0f 1e fa             endbr64\n" +
+                        "  4003d4:       c3                      ret\n" +
+                        "  4003d5:       66 2e 0f 1f 84 00 00    cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  4003dc:       00 00 00\n" +
+                        "  4003df:       90                      nop\n" +
+                        "\n" +
+                        "00000000004003e0 <deregister_tm_clones>:\n" +
+                        "  4003e0:       b8 20 30 40 00          mov    eax,0x403020\n" +
+                        "  4003e5:       48 3d 20 30 40 00       cmp    rax,0x403020\n" +
+                        "  4003eb:       74 13                   je     400400 <deregister_tm_clones+0x20>\n" +
+                        "  4003ed:       b8 00 00 00 00          mov    eax,0x0\n" +
+                        "  4003f2:       48 85 c0                test   rax,rax\n" +
+                        "  4003f5:       74 09                   je     400400 <deregister_tm_clones+0x20>\n" +
+                        "  4003f7:       bf 20 30 40 00          mov    edi,0x403020\n" +
+                        "  4003fc:       ff e0                   jmp    rax\n" +
+                        "  4003fe:       66 90                   xchg   ax,ax\n" +
+                        "  400400:       c3                      ret\n" +
+                        "  400401:       0f 1f 40 00             nop    DWORD PTR [rax+0x0]\n" +
+                        "  400405:       66 66 2e 0f 1f 84 00    data16 cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  40040c:       00 00 00 00\n" +
+                        "\n" +
+                        "0000000000400410 <register_tm_clones>:\n" +
+                        "  400410:       be 20 30 40 00          mov    esi,0x403020\n" +
+                        "  400415:       48 81 ee 20 30 40 00    sub    rsi,0x403020\n" +
+                        "  40041c:       48 89 f0                mov    rax,rsi\n" +
+                        "  40041f:       48 c1 ee 3f             shr    rsi,0x3f\n" +
+                        "  400423:       48 c1 f8 03             sar    rax,0x3\n" +
+                        "  400427:       48 01 c6                add    rsi,rax\n" +
+                        "  40042a:       48 d1 fe                sar    rsi,1\n" +
+                        "  40042d:       74 11                   je     400440 <register_tm_clones+0x30>\n" +
+                        "  40042f:       b8 00 00 00 00          mov    eax,0x0\n" +
+                        "  400434:       48 85 c0                test   rax,rax\n" +
+                        "  400437:       74 07                   je     400440 <register_tm_clones+0x30>\n" +
+                        "  400439:       bf 20 30 40 00          mov    edi,0x403020\n" +
+                        "  40043e:       ff e0                   jmp    rax\n" +
+                        "  400440:       c3                      ret\n" +
+                        "  400441:       0f 1f 40 00             nop    DWORD PTR [rax+0x0]\n" +
+                        "  400445:       66 66 2e 0f 1f 84 00    data16 cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  40044c:       00 00 00 00\n" +
+                        "\n" +
+                        "0000000000400450 <__do_global_dtors_aux>:\n" +
+                        "  400450:       f3 0f 1e fa             endbr64\n" +
+                        "  400454:       80 3d c1 2b 00 00 00    cmp    BYTE PTR [rip+0x2bc1],0x0        # 40301c <completed.0>\n" +
+                        "  40045b:       75 13                   jne    400470 <__do_global_dtors_aux+0x20>\n" +
+                        "  40045d:       55                      push   rbp\n" +
+                        "  40045e:       48 89 e5                mov    rbp,rsp\n" +
+                        "  400461:       e8 7a ff ff ff          call   4003e0 <deregister_tm_clones>\n" +
+                        "  400466:       c6 05 af 2b 00 00 01    mov    BYTE PTR [rip+0x2baf],0x1        # 40301c <completed.0>\n" +
+                        "  40046d:       5d                      pop    rbp\n" +
+                        "  40046e:       c3                      ret\n" +
+                        "  40046f:       90                      nop\n" +
+                        "  400470:       c3                      ret\n" +
+                        "  400471:       0f 1f 40 00             nop    DWORD PTR [rax+0x0]\n" +
+                        "  400475:       66 66 2e 0f 1f 84 00    data16 cs nop WORD PTR [rax+rax*1+0x0]\n" +
+                        "  40047c:       00 00 00 00\n" +
+                        "\n" +
+                        "0000000000400480 <frame_dummy>:\n" +
+                        "  400480:       f3 0f 1e fa             endbr64\n" +
+                        "  400484:       eb 8a                   jmp    400410 <register_tm_clones>\n" +
+                        "\n" +
+                        "0000000000400486 <vuln>:\n" +
+                        "  400486:       55                      push   rbp\n" +
+                        "  400487:       48 89 e5                mov    rbp,rsp\n" +
+                        "  40048a:       48 83 ec 20             sub    rsp,0x20\n" +
+                        "  40048e:       48 b8 53 55 50 45 52    movabs rax,0x45535f5245505553\n" +
+                        "  400495:       5f 53 45\n" +
+                        "  400498:       48 ba 43 52 45 54 5f    movabs rdx,0x59454b5f54455243\n" +
+                        "  40049f:       4b 45 59\n" +
+                        "  4004a2:       48 89 45 f0             mov    QWORD PTR [rbp-0x10],rax\n" +
+                        "  4004a6:       48 89 55 f8             mov    QWORD PTR [rbp-0x8],rdx\n" +
+                        "  4004aa:       bf e8 11 40 00          mov    edi,0x4011e8\n" +
+                        "  4004af:       e8 bc fe ff ff          call   400370 <puts@plt>\n" +
+                        "  4004b4:       48 8d 45 e0             lea    rax,[rbp-0x20]\n" +
+                        "  4004b8:       ba 10 00 00 00          mov    edx,0x10\n" +
+                        "  4004bd:       48 89 c6                mov    rsi,rax\n" +
+                        "  4004c0:       bf 01 00 00 00          mov    edi,0x1\n" +
+                        "  4004c5:       e8 c6 fe ff ff          call   400390 <read@plt>\n" +
+                        "  4004ca:       48 8d 45 e0             lea    rax,[rbp-0x20]\n" +
+                        "  4004ce:       48 89 c6                mov    rsi,rax\n" +
+                        "  4004d1:       bf fa 11 40 00          mov    edi,0x4011fa\n" +
+                        "  4004d6:       b8 00 00 00 00          mov    eax,0x0\n" +
+                        "  4004db:       e8 a0 fe ff ff          call   400380 <printf@plt>\n" +
+                        "  4004e0:       90                      nop\n" +
+                        "  4004e1:       c9                      leave\n" +
+                        "  4004e2:       c3                      ret\n" +
+                        "\n" +
+                        "00000000004004e3 <main>:\n" +
+                        "  4004e3:       55                      push   rbp\n" +
+                        "  4004e4:       48 89 e5                mov    rbp,rsp\n" +
+                        "  4004e7:       b8 00 00 00 00          mov    eax,0x0\n" +
+                        "  4004ec:       e8 95 ff ff ff          call   400486 <vuln>\n" +
+                        "  4004f1:       90                      nop\n" +
+                        "  4004f2:       5d                      pop    rbp\n" +
+                        "  4004f3:       c3                      ret\n" +
+                        "\n" +
+                        "Disassembly of section .fini:\n" +
+                        "\n" +
+                        "00000000004004f4 <_fini>:\n" +
+                        "  4004f4:       f3 0f 1e fa             endbr64\n" +
+                        "  4004f8:       48 83 ec 08             sub    rsp,0x8\n" +
+                        "  4004fc:       48 83 c4 08             add    rsp,0x8\n" +
+                        "  400500:       c3                      ret\n";
+
         levels.add(new Level(
                 "2a", "Level 2A: Leaking Secrets", "Leak the secret by manipulating null-terminators!",
                 "LEAK",
@@ -139,7 +437,8 @@ public class LevelsRepository {
                 10, code2a, stack2a, presets2a,
                 new DefensePatch(
                         "    read(1, buff, 16); // Safe length, but no null-terminator appended!",
-                        "    read(1, buff, 15); buff[15] = '\\0'; // Null-terminator secures the secret!")));
+                        "    read(1, buff, 15); buff[15] = '\\0'; // Null-terminator secures the secret!"),
+                objdump2a));
 
         // ── LEVEL 2B: Control Flow Hijack ────────────────────────────────────
         List<CodeLine> code2b = new ArrayList<>();

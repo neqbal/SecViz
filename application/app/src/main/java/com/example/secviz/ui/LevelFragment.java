@@ -308,7 +308,7 @@ public class LevelFragment extends Fragment {
             // Auto-open the drawer the first time payload data arrives
             if (!hexDataReceived) {
                 hexDataReceived = true;
-                drawerLayout.openDrawer(GravityCompat.END);
+            //    drawerLayout.openDrawer(GravityCompat.END);
             }
             // Convert Object[] rows → HexDumpAdapter.HexRow
             List<HexDumpAdapter.HexRow> hexRows = new ArrayList<>();
@@ -383,16 +383,7 @@ public class LevelFragment extends Fragment {
                     .show(getChildFragmentManager(), "asm");
         });
 
-        // ── Level 2B: Objdump button + gets() observer ─────────────────────────
-        MaterialButton btnObjdump = root.findViewById(R.id.btn_objdump);
-        if ("2b".equals(level.id) && level.objdump != null) {
-            btnObjdump.setVisibility(View.VISIBLE);
-            btnObjdump.setOnClickListener(v ->
-                    ObjdumpViewerFragment.newInstance(level.objdump)
-                            .show(getChildFragmentManager(), "objdump"));
-        } else {
-            btnObjdump.setVisibility(View.GONE);
-        }
+
 
         viewModel.getsReached.observe(getViewLifecycleOwner(), reached -> {
             if (!Boolean.TRUE.equals(reached)) return;
@@ -498,7 +489,6 @@ public class LevelFragment extends Fragment {
         android.view.LayoutInflater inflater = android.view.LayoutInflater.from(requireContext());
         View panel = inflater.inflate(R.layout.popup_menu_panel, null, false);
 
-        // Measure so we know the width for positioning
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
 
         boolean capturing = Boolean.TRUE.equals(viewModel.captureEnabled.getValue());
@@ -519,7 +509,7 @@ public class LevelFragment extends Fragment {
             captureIcon.setTextColor(0xFF8B949E);
         }
 
-        // Timeline row — only visible if capture is on or timeline was already shown
+        // Timeline row
         View miTimeline = panel.findViewById(R.id.mi_timeline);
         TextView timelineBadge = panel.findViewById(R.id.mi_timeline_badge);
         if (capturing || visible) {
@@ -535,6 +525,9 @@ public class LevelFragment extends Fragment {
             miTimeline.setVisibility(View.GONE);
         }
 
+        // Objdump row
+        View miObjdump = panel.findViewById(R.id.mi_objdump);
+
         android.widget.PopupWindow popup = new android.widget.PopupWindow(
                 panel,
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -544,7 +537,7 @@ public class LevelFragment extends Fragment {
         popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
         popup.setOutsideTouchable(true);
 
-        // Click listeners — dismiss after action
+        // Click listeners
         panel.findViewById(R.id.mi_hex).setOnClickListener(v2 -> {
             popup.dismiss();
             drawerLayout.openDrawer(GravityCompat.END);
@@ -556,6 +549,11 @@ public class LevelFragment extends Fragment {
         miTimeline.setOnClickListener(v2 -> {
             popup.dismiss();
             viewModel.toggleTimelineVisible();
+        });
+        miObjdump.setOnClickListener(v2 -> {
+            popup.dismiss();
+            ObjdumpViewerFragment.newInstance(level.objdump)
+                    .show(getChildFragmentManager(), "objdump");
         });
 
         int[] loc = new int[2];

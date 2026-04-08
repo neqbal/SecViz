@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SecViz</string>
-    <string name="next_stage">Next Stage →</string>
-    <string name="reset">Reset</string>
-    <string name="next_step">Next Step</string>
-    <string name="next_instr">Next Instr (ni)</string>
+    <string name="next_stage">next stage</string>
+    <string name="reset">reset</string>
+    <string name="next_step">next step</string>
+    <string name="next_instr">next instr</string>
 
-    <string name="peek_assembly">Peek Assembly</string>
+    <string name="peek_assembly">reg</string>
     <string name="terminal_label">Terminal / STDOUT</string>
     <string name="enter_payload">Enter payload…</string>
     <string name="send">Send</string>

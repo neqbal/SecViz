@@ -872,9 +872,107 @@ public class LevelViewModel extends ViewModel {
         String newAddr = asmFlat.get(nextIdx).address;
         Integer srcLine = addrToSrcLine.get(newAddr);
         if (srcLine != null) {
-            _activeLineIndex.setValue(srcLine); // raw — don't re-sync asm
+            _activeLineIndex.setValue(srcLine); // raw — don't re-sync asm cursor
+
+            // ── Step-engine bridge (source line known) ────────────────────────
+            checkNiStepTrigger(srcLine);
+        } else {
+            // ── Step-engine bridge (inside gadget / PLT / runtime code) ───────
+            // No source-line mapping: we're inside a ROP gadget or PLT stub.
+            // Advance the step engine so the simulation (gadget hops, win check)
+            // stays in sync even though the C source panel can't update.
+            checkNiStepTriggerNoSrcLine();
         }
     }
+
+
+    /**
+     * When ni advances to a source line that would normally be triggered by the
+     * step engine (e.g. gets() dialog, syscall), fire that handler now.
+     * Only fires if the step engine hasn't already passed that point.
+     */
+    private void checkNiStepTrigger(int srcLine) {
+        if (level == null || srcLine < 0 || srcLine >= level.code.size()) return;
+        String lineText = level.code.get(srcLine).text.trim();
+        int currentStepInt = (int)((_step.getValue() == null ? 0f : _step.getValue()) * 10);
+
+        // ── Post-payload steps (overflow / ROP / win) ─────────────────────────
+        // These trigger when ni reaches code lines AFTER the payload was submitted.
+        // Covers: return address overwrite (2B) and ROP return (3).
+        if (currentStepInt == 50) {
+            switch (level.id) {
+                case "2b": step2b_5(); return;   // show overflow result
+                case "3":  step3_ret(); return;  // leave ; ret fires
+            }
+        }
+        if (currentStepInt == 60) {
+            switch (level.id) {
+                case "2b": step2b_6(); return;   // ret / jump to win()
+                case "3":  step3_hop(); return;  // execute next ROP gadget
+            }
+        }
+        if (currentStepInt == 70 && "2b".equals(level.id)) {
+            step2b_7(); return;  // win() prints flag
+        }
+
+        // ── gets() line → trigger the gets dialog (step 30) ──────────────────
+        if ((lineText.startsWith("gets(") || lineText.contains(" gets("))
+                && currentStepInt < 30) {
+            switch (level.id) {
+                case "2b": step2b_3(); break;
+                case "3":  step3_gets(); break;
+            }
+            return;
+        }
+
+        // ── vuln() call line → push return address (step 10) ─────────────────
+        if (lineText.startsWith("vuln()") && currentStepInt < 10) {
+            switch (level.id) {
+                case "2b": step2b_1(); break;
+                case "3":  step3_callVuln(); break;
+            }
+            return;
+        }
+
+        // ── void vuln() prologue → stack frame setup (step 20) ───────────────
+        if (lineText.startsWith("void vuln()") && currentStepInt < 20) {
+            switch (level.id) {
+                case "2b": step2b_2(); break;
+                case "3":  step3_prologue(); break;
+            }
+        }
+    }
+
+    /**
+     * Called from handleNextInstruction() when the new asm address has NO
+     * source-line mapping — i.e. we are inside a gadget / PLT stub / runtime
+     * code. In that case we still need to advance the step engine so that the
+     * simulation stays in sync (ROP hops, win condition check, etc.).
+     */
+    private void checkNiStepTriggerNoSrcLine() {
+        if (level == null) return;
+        int currentStepInt = (int)((_step.getValue() == null ? 0f : _step.getValue()) * 10);
+
+        // ROP / post-payload phase
+        if (currentStepInt == 50) {
+            switch (level.id) {
+                case "2b": step2b_5(); return;
+                case "3":  step3_ret(); return;
+            }
+        }
+        if (currentStepInt == 60) {
+            switch (level.id) {
+                case "2b": step2b_6(); return;
+                case "3":  step3_hop(); return;  // ← main fix: fires next gadget
+            }
+        }
+        if (currentStepInt == 70 && "2b".equals(level.id)) {
+            step2b_7();
+        }
+    }
+
+
+
 
     /** Returns the full flat asm list; UI builds adapter from this once on load. */
     public List<AsmLine> getAsmFlat() {

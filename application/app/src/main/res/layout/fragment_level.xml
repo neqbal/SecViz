@@ -62,7 +62,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
-                android:text="{ } Objdump"
+                android:text="{ }"
                 android:textSize="11sp"
                 android:textColor="@color/accent"
                 android:visibility="gone"/>
@@ -81,13 +81,65 @@
                 android:insetBottom="0dp"/>
         </LinearLayout>
 
+        <!-- Control buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical">
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_reset"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/reset"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_next_step"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="@string/next_step"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_next_instr"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="@string/next_instr"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_next_stage"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="@string/next_stage"
+                android:backgroundTint="@color/success"/>
+
+        </LinearLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/bg_primary">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="0dp">
         <!-- Code / Assembly tabbed viewer -->
-        <androidx.cardview.widget.CardView
+        <com.example.secviz.ui.views.ResizableCardView
             android:id="@+id/card_code"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="3"
+            android:layout_height="240dp"
             app:cardBackgroundColor="@color/bg_surface"
             app:cardCornerRadius="8dp"
             app:cardElevation="0dp">
@@ -150,16 +202,25 @@
                     android:visibility="gone"/>
 
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+
+            <!-- drag handle — always last child -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="20dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/drag_handle"
+                android:alpha="0.4"/>
+
+        </com.example.secviz.ui.views.ResizableCardView>
 
         <!-- Terminal / Console -->
-        <androidx.cardview.widget.CardView
+        <com.example.secviz.ui.views.ResizableCardView
+            android:id="@+id/card_console"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1.2"
-            android:layout_marginTop="8dp"
-            app:cardBackgroundColor="@color/bg_elevated"
+            android:layout_height="100dp"
+            app:cardBackgroundColor="@color/bg_surface"
             app:cardCornerRadius="8dp"
+            android:layout_marginTop="8dp"
             app:cardElevation="0dp">
 
             <LinearLayout
@@ -198,17 +259,23 @@
                     android:layout_height="match_parent"
                     android:padding="8dp"/>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="20dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/drag_handle"
+                android:alpha="0.4"/>
+
+        </com.example.secviz.ui.views.ResizableCardView>
 
         <!-- Stack Architecture Visualizer -->
-        <androidx.cardview.widget.CardView
+        <com.example.secviz.ui.views.ResizableCardView
             android:id="@+id/card_stack_visualizer"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="8dp"
-            app:cardBackgroundColor="@color/bg_elevated"
+            android:layout_height="240dp"
+            app:cardBackgroundColor="@color/bg_surface"
             app:cardCornerRadius="8dp"
+            android:layout_marginTop="8dp"
             app:cardElevation="0dp">
 
             <androidx.core.widget.NestedScrollView
@@ -222,16 +289,23 @@
                     android:layout_height="wrap_content"/>
 
             </androidx.core.widget.NestedScrollView>
-        </androidx.cardview.widget.CardView>
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="20dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/drag_handle"
+                android:alpha="0.4"/>
+
+        </com.example.secviz.ui.views.ResizableCardView>
 
         <!-- ── Register State Timeline strip ──────────────────────────────────── -->
-        <androidx.cardview.widget.CardView
+        <com.example.secviz.ui.views.ResizableCardView
             android:id="@+id/card_register_timeline"
             android:layout_width="match_parent"
-            android:layout_height="130dp"
-            android:layout_marginTop="8dp"
-            app:cardBackgroundColor="@color/bg_elevated"
+            android:layout_height="240dp"
+            app:cardBackgroundColor="@color/bg_surface"
             app:cardCornerRadius="8dp"
+            android:layout_marginTop="8dp"
             app:cardElevation="0dp">
 
             <LinearLayout
@@ -261,7 +335,14 @@
                     android:clipToPadding="false"/>
 
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="20dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/drag_handle"
+                android:alpha="0.4"/>
+
+        </com.example.secviz.ui.views.ResizableCardView>
 
         <!-- Status Info Box -->
         <androidx.cardview.widget.CardView
@@ -350,45 +431,9 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- Control buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical">
+    </LinearLayout>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_reset"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/reset"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_next_step"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/next_step"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_next_instr"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:text="@string/next_instr"/>
-
-            <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_next_stage"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/next_stage"
-                android:backgroundTint="@color/success"/>
-        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 
         <!-- Snackbar anchor -->
         <View
