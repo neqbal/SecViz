@@ -82,7 +82,7 @@
         </LinearLayout>
 
 
-        <!-- Code viewer -->
+        <!-- Code / Assembly tabbed viewer -->
         <androidx.cardview.widget.CardView
             android:id="@+id/card_code"
             android:layout_width="match_parent"
@@ -92,12 +92,64 @@
             app:cardCornerRadius="8dp"
             app:cardElevation="0dp">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rv_code"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="8dp"
-                android:clipToPadding="false"/>
+                android:orientation="vertical">
+
+                <!-- Tab strip: Source | Assembly -->
+                <LinearLayout
+                    android:id="@+id/ll_code_tabs"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:orientation="horizontal"
+                    android:background="@color/bg_elevated">
+
+                    <TextView
+                        android:id="@+id/tab_source"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:text="Source"
+                        android:textSize="12sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/accent"
+                        android:background="@drawable/bg_tab_active"/>
+
+                    <TextView
+                        android:id="@+id/tab_assembly"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:text="Assembly"
+                        android:textSize="12sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/text_muted"
+                        android:background="@drawable/bg_tab_inactive"/>
+
+                </LinearLayout>
+
+                <!-- Source code view (default visible) -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_code"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp"
+                    android:clipToPadding="false"
+                    android:visibility="visible"/>
+
+                <!-- Assembly / disassembly view (hidden by default) -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_asm"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="4dp"
+                    android:clipToPadding="false"
+                    android:visibility="gone"/>
+
+            </LinearLayout>
         </androidx.cardview.widget.CardView>
 
         <!-- Terminal / Console -->
@@ -319,6 +371,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:text="@string/next_step"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_next_instr"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="@string/next_instr"/>
 
             <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1"/>
 

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Active tab: bottom border in accent colour -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <color android:color="@color/bg_surface"/>
+    </item>
+    <item android:top="-4dp" android:left="-4dp" android:right="-4dp">
+        <shape android:shape="rectangle">
+            <stroke android:width="2dp" android:color="@color/accent"/>
+            <corners android:radius="0dp"/>
+        </shape>
+    </item>
+</layer-list>

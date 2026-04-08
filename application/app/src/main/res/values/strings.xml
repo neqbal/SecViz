@@ -4,6 +4,8 @@
     <string name="next_stage">Next Stage →</string>
     <string name="reset">Reset</string>
     <string name="next_step">Next Step</string>
+    <string name="next_instr">Next Instr (ni)</string>
+
     <string name="peek_assembly">Peek Assembly</string>
     <string name="terminal_label">Terminal / STDOUT</string>
     <string name="enter_payload">Enter payload…</string>

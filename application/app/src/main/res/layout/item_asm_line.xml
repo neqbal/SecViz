@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Row layout for Assembly tab.
+
+  Layout:
+  ┌─ accent bar (2dp, visible when active) ─┐
+  │ [►]  [address]   [mnemonic / full text]  │
+  └──────────────────────────────────────────┘
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:minHeight="28dp"
+    android:gravity="center_vertical">
+
+    <!-- Active-row left bar (2 dp accent stripe) -->
+    <View
+        android:id="@+id/view_asm_active_bar"
+        android:layout_width="2dp"
+        android:layout_height="match_parent"
+        android:minHeight="28dp"
+        android:background="@color/accent"
+        android:visibility="invisible"/>
+
+    <!-- GDB arrow indicator -->
+    <TextView
+        android:id="@+id/tv_asm_arrow"
+        android:layout_width="20dp"
+        android:layout_height="wrap_content"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:textColor="@color/accent"
+        android:gravity="center"
+        android:text=""/>
+
+    <!-- Full raw line text (address + bytes + mnemonic) -->
+    <TextView
+        android:id="@+id/tv_asm_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:paddingHorizontal="4dp"
+        android:paddingVertical="2dp"
+        android:textColor="@color/text_muted"/>
+
+</LinearLayout>

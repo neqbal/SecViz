@@ -27,6 +27,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.secviz.R;
 import com.example.secviz.data.Level;
 import com.example.secviz.data.StackBlock;
+import com.example.secviz.data.AsmLine;
+import com.example.secviz.ui.adapters.AsmLineAdapter;
 import com.example.secviz.ui.adapters.CodeLineAdapter;
 import com.example.secviz.ui.adapters.ConsoleAdapter;
 import com.example.secviz.ui.adapters.HexDumpAdapter;
@@ -59,14 +61,19 @@ public class LevelFragment extends Fragment {
     private LinearLayout layoutInput;
     private TextInputEditText etInput;
     private LinearLayout layoutPresets;
-    private MaterialButton btnNextStep, btnReset, btnNextStage, btnSend;
+    private MaterialButton btnNextStep, btnNextInstr, btnReset, btnNextStage, btnSend;
     private View snackbarAnchor;
     private DrawerLayout drawerLayout;
     private boolean hexDataReceived = false;
     private CodeLineAdapter codeAdapter;
+    private AsmLineAdapter asmAdapter;
     private ConsoleAdapter consoleAdapter;
     private HexDumpAdapter hexDumpAdapter;
     private RegisterTimelineAdapter timelineAdapter;
+    // Assembly tab UI references
+    private RecyclerView rvAsm;
+    private TextView tabSource, tabAssembly;
+    private boolean isAsmTabActive = false;
     private int lastSnapshotCount = 0;
     private List<Pair<String, Boolean>> consoleItems = new ArrayList<>();
 
@@ -106,6 +113,10 @@ public class LevelFragment extends Fragment {
         btnSend = root.findViewById(R.id.btn_send);
         snackbarAnchor = root.findViewById(R.id.snackbar_anchor);
         drawerLayout = root.findViewById(R.id.drawer_layout);
+        rvAsm        = root.findViewById(R.id.rv_asm);
+        tabSource    = root.findViewById(R.id.tab_source);
+        tabAssembly  = root.findViewById(R.id.tab_assembly);
+        btnNextInstr = root.findViewById(R.id.btn_next_instr);
         RecyclerView rvHexDump = root.findViewById(R.id.rv_hex_dump);
         MaterialButton btnHexClose  = root.findViewById(R.id.btn_hex_close);
 
@@ -126,6 +137,21 @@ public class LevelFragment extends Fragment {
                 () -> viewModel.togglePatch());
         rvCode.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvCode.setAdapter(codeAdapter);
+
+        // Assembly RecyclerView
+        List<AsmLine> asmFlat = viewModel.getAsmFlat();
+        asmAdapter = new AsmLineAdapter(asmFlat, -1);
+        rvAsm.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvAsm.setAdapter(asmAdapter);
+
+        // Tab switching
+        tabSource.setOnClickListener(v -> showTab(false));
+        tabAssembly.setOnClickListener(v -> showTab(true));
+        // Assembly tab hidden for levels with no objdump
+        if (asmFlat.isEmpty()) {
+            tabAssembly.setVisibility(View.GONE);
+            tabAssembly.setEnabled(false);
+        }
 
         // Console RecyclerView
         consoleAdapter = new ConsoleAdapter(consoleItems);
@@ -230,6 +256,16 @@ public class LevelFragment extends Fragment {
             boolean waitingForInput = stepInt == 40;
             layoutInput.setVisibility(waitingForInput ? View.VISIBLE : View.GONE);
             btnNextStep.setEnabled(!waitingForInput && stepInt != 1000);
+            if (btnNextInstr != null) btnNextInstr.setEnabled(!waitingForInput && stepInt != 1000);
+        });
+
+        // Assembly cursor observer
+        viewModel.activeAsmInstrIdx.observe(getViewLifecycleOwner(), idx -> {
+            if (idx == null || idx < 0) return;
+            asmAdapter.setActiveIdx(idx);
+            if (isAsmTabActive) {
+                rvAsm.scrollToPosition(Math.max(0, idx - 2));
+            }
         });
 
         viewModel.consoleOut.observe(getViewLifecycleOwner(), items -> {
@@ -311,6 +347,11 @@ public class LevelFragment extends Fragment {
         btnNextStep.setOnClickListener(v -> {
             vibrate(new long[]{20});
             viewModel.handleNextStep();
+        });
+
+        btnNextInstr.setOnClickListener(v -> {
+            vibrate(new long[]{20});
+            viewModel.handleNextInstruction();
         });
 
         btnReset.setOnClickListener(v -> viewModel.reset());
@@ -403,8 +444,37 @@ public class LevelFragment extends Fragment {
                 .show();
     }
 
+    /**
+     * Switch between Source and Assembly tabs.
+     * @param showAsm true → show Assembly, false → show Source
+     */
+    private void showTab(boolean showAsm) {
+        isAsmTabActive = showAsm;
+
+        // Toggle RecyclerView visibility
+        rvCode.setVisibility(showAsm ? View.GONE  : View.VISIBLE);
+        rvAsm .setVisibility(showAsm ? View.VISIBLE : View.GONE);
+
+        // Active tab: accent text + bottom border drawable; inactive: muted + plain
+        int activeColor   = ContextCompat.getColor(requireContext(), R.color.accent);
+        int inactiveColor = ContextCompat.getColor(requireContext(), R.color.text_muted);
+
+        tabSource  .setTextColor(showAsm ? inactiveColor : activeColor);
+        tabAssembly.setTextColor(showAsm ? activeColor   : inactiveColor);
+        tabSource  .setBackgroundResource(showAsm ? R.drawable.bg_tab_inactive : R.drawable.bg_tab_active);
+        tabAssembly.setBackgroundResource(showAsm ? R.drawable.bg_tab_active   : R.drawable.bg_tab_inactive);
+
+        // If switching to Assembly, scroll to current instruction immediately
+        if (showAsm) {
+            Integer idx = viewModel.activeAsmInstrIdx.getValue();
+            if (idx != null && idx >= 0) {
+                rvAsm.scrollToPosition(Math.max(0, idx - 2));
+            }
+        }
+    }
 
     private void submitInput() {
+
         if (etInput == null) return;
         String input = etInput.getText() != null ? etInput.getText().toString() : "";
         if (input.isEmpty()) return;

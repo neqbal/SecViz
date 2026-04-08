@@ -7,12 +7,16 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import com.example.secviz.data.AsmLine;
+import com.example.secviz.data.CodeLine;
 import com.example.secviz.data.Level;
 import com.example.secviz.data.RegisterSnapshot;
 import com.example.secviz.data.StackBlock;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class LevelViewModel extends ViewModel {
 
@@ -81,6 +85,26 @@ public class LevelViewModel extends ViewModel {
     private final MutableLiveData<Boolean> _getsReached = new MutableLiveData<>(false);
     public final LiveData<Boolean> getsReached = _getsReached;
 
+    // ── Assembly / ni state ──────────────────────────────────────────────────
+    /** Flat list of all AsmLine objects parsed from level.objdump on init. */
+    private List<AsmLine> asmFlat = new ArrayList<>();
+
+    /** address (hex, no 0x) → flat-list index */
+    private final Map<String, Integer> addrToAsmIdx = new HashMap<>();
+
+    /** C-source line index → first asm address for that line */
+    private final Map<Integer, String> srcLineToFirstAddr = new HashMap<>();
+
+    /** asm address → C-source line index */
+    private final Map<String, Integer> addrToSrcLine = new HashMap<>();
+
+    /** Currently highlighted assembly instruction index (-1 = no asm available) */
+    private int activeAsmIdx = -1;
+
+    /** Exposed to UI — drives Assembly tab highlighting and scroll */
+    private final MutableLiveData<Integer> _activeAsmInstrIdx = new MutableLiveData<>(-1);
+    public  final LiveData<Integer>         activeAsmInstrIdx  = _activeAsmInstrIdx;
+
     public void toggleCaptureEnabled() {
         _captureEnabled.setValue(!Boolean.TRUE.equals(_captureEnabled.getValue()));
     }
@@ -111,6 +135,7 @@ public class LevelViewModel extends ViewModel {
         this.level = lvl;
         this.initialEsp = findInitialEsp(lvl);
         reset();
+        buildAsmMaps();
     }
 
     private int findInitialEsp(Level lvl) {
@@ -151,6 +176,11 @@ public class LevelViewModel extends ViewModel {
         ropEspIdx = -1;
         ropHopCount = 0;
         recordSnapshot("Program Ready", "main");
+        // Reset assembly cursor
+        activeAsmIdx = -1;
+        _activeAsmInstrIdx.setValue(-1);
+        // Sync to start line if maps are already built
+        syncAsmToSourceLine(level.startCodeLine);
     }
 
     public void setUserInput(String input) {
@@ -214,7 +244,7 @@ public class LevelViewModel extends ViewModel {
 
     private void step0(String input, boolean patched) {
         int nextIdx = level.startCodeLine + 1;
-        _activeLineIndex.setValue(nextIdx);
+        setActiveSourceLine(nextIdx);
         String lineText = level.code.get(nextIdx).text;
         if (lineText.contains("puts")) {
             addConsole("I will echo whatever you say.", false);
@@ -231,7 +261,7 @@ public class LevelViewModel extends ViewModel {
 
     private void step1(boolean patched) {
         int callIdx = findInCode("vuln();", level.startCodeLine);
-        _activeLineIndex.setValue(callIdx);
+        setActiveSourceLine(callIdx);
         _statusTitle.setValue("Calling vuln()");
         pushReturnAddr(patched);
         _step.setValue(2f);
@@ -259,7 +289,7 @@ public class LevelViewModel extends ViewModel {
             }
         }
         if (firstVarIdx == -1) return;
-        _activeLineIndex.setValue(firstVarIdx);
+        setActiveSourceLine(firstVarIdx);
         _statusTitle.setValue("vuln() Local Variables Allocation");
 
         List<StackBlock> s = deepCopyStack(getStack());
@@ -280,7 +310,7 @@ public class LevelViewModel extends ViewModel {
     private void step2_5() {
         int buffIdx = findInCode("char buff", 0);
         if (buffIdx == -1) buffIdx = (_activeLineIndex.getValue() == null ? 0 : _activeLineIndex.getValue()) + 1;
-        _activeLineIndex.setValue(buffIdx);
+        setActiveSourceLine(buffIdx);
         _statusTitle.setValue("vuln() Array Allocation");
 
         List<StackBlock> s = deepCopyStack(getStack());
@@ -303,7 +333,7 @@ public class LevelViewModel extends ViewModel {
         }
 
         if (putsInVulnIdx != -1) {
-            _activeLineIndex.setValue(putsInVulnIdx);
+            setActiveSourceLine(putsInVulnIdx);
             String lineText = level.code.get(putsInVulnIdx).text;
             String printed = extractQuoted(lineText);
             addConsole(printed, false);
@@ -311,7 +341,7 @@ public class LevelViewModel extends ViewModel {
             _step.setValue(3.5f);
             recordSnapshot("puts() in vuln", "puts@plt");
         } else {
-            _activeLineIndex.setValue(readIdx);
+            setActiveSourceLine(readIdx);
             if (level.id.equals("2a")) {
                 _statusDesc.setValue(patched
                         ? "read() securely terminates the buffer."
@@ -325,7 +355,7 @@ public class LevelViewModel extends ViewModel {
 
     private void step3_5(boolean patched) {
         int readIdx = findInCode("read(1, ", 0);
-        _activeLineIndex.setValue(readIdx);
+        setActiveSourceLine(readIdx);
         if (level.id.equals("2a")) {
             _statusDesc.setValue(patched
                     ? "read() securely terminates the buffer. The secret is completely safe!"
@@ -379,7 +409,7 @@ public class LevelViewModel extends ViewModel {
     private void step5(String input, boolean patched) {
         int printfIdx = findInCode("printf", 0);
         if (printfIdx != -1) {
-            _activeLineIndex.setValue(printfIdx);
+            setActiveSourceLine(printfIdx);
             _statusTitle.setValue("Executing printf()");
             int maxLen = level.id.equals("2a") ? (patched ? 15 : 16) : 100;
             String out = input.substring(0, Math.min(maxLen, input.length()));
@@ -389,7 +419,7 @@ public class LevelViewModel extends ViewModel {
         } else {
             int rIdx = findInCode("read(1, ", 0);
             int endIdx = findClosingBraceAfter(rIdx);
-            _activeLineIndex.setValue(endIdx);
+            setActiveSourceLine(endIdx);
             _statusTitle.setValue("vuln() Epilogue");
         }
         _step.setValue(6f);
@@ -440,14 +470,14 @@ public class LevelViewModel extends ViewModel {
         }
 
         if (putsAfterVuln != -1) {
-            _activeLineIndex.setValue(putsAfterVuln);
+            setActiveSourceLine(putsAfterVuln);
             _statusTitle.setValue("Returned Safely to main()");
             addConsole("Goodbye!!!", false);
             _step.setValue(8f);
             recordSnapshot("puts() in main", "puts@plt");
         } else {
             int endMain = findClosingBraceAfter(level.startCodeLine);
-            _activeLineIndex.setValue(endMain);
+            setActiveSourceLine(endMain);
             _statusTitle.setValue("Program Exited");
             _step.setValue(100f);
             recordSnapshot("main() exited", "exit");
@@ -457,7 +487,7 @@ public class LevelViewModel extends ViewModel {
 
     private void step8(String input, boolean patched) {
         int endMain = findClosingBraceAfter(level.startCodeLine);
-        _activeLineIndex.setValue(endMain);
+        setActiveSourceLine(endMain);
         _statusTitle.setValue("Program Exited");
         _step.setValue(100f);
         recordSnapshot("main() exited", "exit");
@@ -516,7 +546,7 @@ public class LevelViewModel extends ViewModel {
     /** Step 1: call vuln — push return address */
     private void step2b_1() {
         int callIdx = findInCode("vuln();", 0);
-        _activeLineIndex.setValue(callIdx >= 0 ? callIdx : level.startCodeLine);
+        setActiveSourceLine(callIdx >= 0 ? callIdx : level.startCodeLine);
         _statusTitle.setValue("call vuln()");
         _statusDesc.setValue("CPU pushes the return address (0x4004ac) onto the stack, then jumps to vuln().");
 
@@ -536,7 +566,7 @@ public class LevelViewModel extends ViewModel {
     /** Step 2: vuln() prologue — push rbp, sub rsp,0x20 */
     private void step2b_2() {
         int vulnIdx = findInCode("void vuln() {", 0);
-        _activeLineIndex.setValue(vulnIdx >= 0 ? vulnIdx : level.startCodeLine);
+        setActiveSourceLine(vulnIdx >= 0 ? vulnIdx : level.startCodeLine);
         _statusTitle.setValue("vuln() Prologue");
         _statusDesc.setValue("push rbp saves caller's frame. sub rsp,0x20 reserves 32 bytes for buf.");
 
@@ -556,7 +586,7 @@ public class LevelViewModel extends ViewModel {
     /** Step 3: gets(buf) called — notify LevelFragment */
     private void step2b_3() {
         int getsIdx = findInCode("gets(buf);", 0);
-        _activeLineIndex.setValue(getsIdx >= 0 ? getsIdx : level.startCodeLine);
+        setActiveSourceLine(getsIdx >= 0 ? getsIdx : level.startCodeLine);
         _statusTitle.setValue("gets() called");
         _statusDesc.setValue("gets() reads from stdin with NO bounds check. Choose how to respond.");
         _step.setValue(4f); // pause — wait for dialog result
@@ -638,7 +668,7 @@ public class LevelViewModel extends ViewModel {
     /** Step 5: show result of gets — highlight leave/ret */
     private void step2b_5() {
         int retIdx = findInCode("}", findInCode("gets(buf);", 0));
-        _activeLineIndex.setValue(retIdx >= 0 ? retIdx : level.startCodeLine);
+        setActiveSourceLine(retIdx >= 0 ? retIdx : level.startCodeLine);
         _statusTitle.setValue("vuln() Epilogue — ret");
 
         // Check if ret addr was overwritten
@@ -676,7 +706,7 @@ public class LevelViewModel extends ViewModel {
 
         if (hijacked && landedOnWin) {
             int winIdx = findInCode("puts(\"SHELL OBTAINED", 0);
-            _activeLineIndex.setValue(winIdx >= 0 ? winIdx : 0);
+            setActiveSourceLine(winIdx >= 0 ? winIdx : 0);
             _statusTitle.setValue("RIP hijacked → win()!");
             _statusType.setValue("success");
             _statusDesc.setValue("Execution jumped to 0x400476. win() is now running.");
@@ -696,7 +726,7 @@ public class LevelViewModel extends ViewModel {
             // Safe return
             int mainEndIdx = findInCode("return 0;", 0);
             if (mainEndIdx < 0) mainEndIdx = findClosingBraceAfter(findInCode("int main() {", 0));
-            _activeLineIndex.setValue(mainEndIdx);
+            setActiveSourceLine(mainEndIdx);
             _statusTitle.setValue("Returned Safely to main()");
             _statusType.setValue("success");
             _statusDesc.setValue("No overflow — program returned normally.");
@@ -718,6 +748,149 @@ public class LevelViewModel extends ViewModel {
                 ? new ArrayList<>() : _consoleOut.getValue());
         list.add(new Pair<>(text, isGarbage));
         _consoleOut.setValue(list);
+    }
+
+    // ── Assembly / ni helpers ─────────────────────────────────────────────────
+
+    /**
+     * Parses level.objdump into asmFlat and populates all address lookup maps.
+     * Also walks level.code CodeLine.asm varargs to map source lines ↔ addresses.
+     * Called once after level load.
+     */
+    private void buildAsmMaps() {
+        asmFlat.clear();
+        addrToAsmIdx.clear();
+        srcLineToFirstAddr.clear();
+        addrToSrcLine.clear();
+        activeAsmIdx = -1;
+
+        if (level == null || level.objdump == null) return;
+
+        // ── parse objdump into flat AsmLine list ──────────────────────────────
+        java.util.regex.Pattern instrPat = java.util.regex.Pattern
+                .compile("^\\s+([0-9a-fA-F]+):\\s+.*");
+        java.util.regex.Pattern hdrPat = java.util.regex.Pattern
+                .compile("[0-9a-fA-F]{8,16}\\s+<[^>]+>:.*");
+        java.util.regex.Pattern callPat = java.util.regex.Pattern
+                .compile("\\bcall\\s+([0-9a-fA-F]+)");
+
+        String[] rawLines = level.objdump.split("\\n");
+        for (String raw : rawLines) {
+            int idx = asmFlat.size();
+            String trimmed = raw.trim();
+
+            if (hdrPat.matcher(trimmed).matches()) {
+                asmFlat.add(new AsmLine(idx, "", raw, true, null));
+                continue;
+            }
+
+            java.util.regex.Matcher m = instrPat.matcher(raw);
+            if (m.matches()) {
+                String addr = m.group(1).toLowerCase(java.util.Locale.US);
+                String callTarget = null;
+                java.util.regex.Matcher cm = callPat.matcher(raw);
+                if (cm.find()) callTarget = cm.group(1).toLowerCase(java.util.Locale.US);
+                asmFlat.add(new AsmLine(idx, addr, raw, false, callTarget));
+                addrToAsmIdx.put(addr, idx);
+                continue;
+            }
+
+            // Blank / separator
+            asmFlat.add(new AsmLine(idx, "", raw, false, null));
+        }
+
+        // ── map source lines ↔ asm addresses via CodeLine.asm varargs ─────────
+        if (level.code != null) {
+            java.util.regex.Pattern addrPat = java.util.regex.Pattern
+                    .compile("^\\s+([0-9a-fA-F]+):");
+            for (int srcIdx = 0; srcIdx < level.code.size(); srcIdx++) {
+                CodeLine cl = level.code.get(srcIdx);
+                if (cl.asm == null || cl.asm.isEmpty()) continue;
+                for (String asmLine : cl.asm) {
+                    java.util.regex.Matcher m2 = addrPat.matcher(asmLine);
+                    if (m2.find()) {
+                        String addr = m2.group(1).toLowerCase(java.util.Locale.US);
+                        addrToSrcLine.put(addr, srcIdx);
+                        if (!srcLineToFirstAddr.containsKey(srcIdx)) {
+                            srcLineToFirstAddr.put(srcIdx, addr);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Prime cursor to start line
+        syncAsmToSourceLine(level.startCodeLine);
+    }
+
+    /**
+     * Move the assembly cursor to the first instruction of the given C source line.
+     * No-op if that source line has no associated asm address.
+     */
+    private void syncAsmToSourceLine(int srcIdx) {
+        String addr = srcLineToFirstAddr.get(srcIdx);
+        if (addr == null) return;
+        Integer flatIdx = addrToAsmIdx.get(addr);
+        if (flatIdx == null) return;
+        activeAsmIdx = flatIdx;
+        _activeAsmInstrIdx.setValue(flatIdx);
+    }
+
+    /**
+     * GDB "ni" — advance one machine instruction.
+     *
+     * Rules:
+     *   • CALL instruction → jump to call target address (enter function)
+     *   • Otherwise      → sequential next in the flat list
+     *   • Skip header/blank lines
+     *   • Sync _activeLineIndex to the C source line that owns the new instruction
+     */
+    public void handleNextInstruction() {
+        if (asmFlat.isEmpty() || activeAsmIdx < 0) return;
+
+        AsmLine cur = asmFlat.get(activeAsmIdx);
+        int nextIdx;
+
+        if (cur.callTarget != null) {
+            Integer targetFlatIdx = addrToAsmIdx.get(cur.callTarget);
+            nextIdx = (targetFlatIdx != null) ? targetFlatIdx : activeAsmIdx + 1;
+        } else {
+            nextIdx = activeAsmIdx + 1;
+        }
+
+        // Skip non-instruction lines
+        while (nextIdx < asmFlat.size()) {
+            AsmLine c = asmFlat.get(nextIdx);
+            if (!c.isHeader && !c.address.isEmpty()) break;
+            nextIdx++;
+        }
+        if (nextIdx >= asmFlat.size()) return;
+
+        activeAsmIdx = nextIdx;
+        _activeAsmInstrIdx.setValue(nextIdx);
+
+        String newAddr = asmFlat.get(nextIdx).address;
+        Integer srcLine = addrToSrcLine.get(newAddr);
+        if (srcLine != null) {
+            _activeLineIndex.setValue(srcLine); // raw — don't re-sync asm
+        }
+    }
+
+    /** Returns the full flat asm list; UI builds adapter from this once on load. */
+    public List<AsmLine> getAsmFlat() {
+        return asmFlat;
+    }
+
+    // ── Code helpers ──────────────────────────────────────────────────────────
+
+
+    /**
+     * Sets the active source line AND syncs the asm cursor.
+     * Prefer this over setActiveSourceLine() directly from step handlers.
+     */
+    private void setActiveSourceLine(int idx) {
+        _activeLineIndex.setValue(idx);
+        syncAsmToSourceLine(idx);
     }
 
     private int findInCode(String substr, int fromIndex) {
@@ -798,7 +971,7 @@ public class LevelViewModel extends ViewModel {
 
     /** Stage 1: call vuln() — push return address */
     private void step3_callVuln() {
-        _activeLineIndex.setValue(findInCode("vuln();", 0));
+        setActiveSourceLine(findInCode("vuln();", 0));
         _statusTitle.setValue("call vuln()");
         _statusDesc.setValue("CPU pushes return address 0x4004b9 onto the stack, then jumps to vuln.");
         _statusType.setValue("info");
@@ -818,7 +991,7 @@ public class LevelViewModel extends ViewModel {
 
     /** Stage 2: vuln() prologue — push rbp, sub rsp */
     private void step3_prologue() {
-        _activeLineIndex.setValue(findInCode("void vuln() {", 0));
+        setActiveSourceLine(findInCode("void vuln() {", 0));
         _statusTitle.setValue("vuln() Prologue");
         _statusDesc.setValue("push rbp — saved frame pointer pushed. sub rsp, 0x20 — 32-byte buffer allocated for buf.");
         _statusType.setValue("info");
@@ -839,7 +1012,7 @@ public class LevelViewModel extends ViewModel {
 
     /** Stage 3: gets() — pause and wait for player to build ROP chain or normal input */
     private void step3_gets() {
-        _activeLineIndex.setValue(findInCode("gets(buf);", 0));
+        setActiveSourceLine(findInCode("gets(buf);", 0));
         _statusTitle.setValue("gets() — Vulnerable Read");
         _statusDesc.setValue("gets() reads into buf[32] with no bounds check. " +
                 "Will you send a normal string, NX‑demo shellcode, or a ROP chain?");
@@ -929,7 +1102,7 @@ public class LevelViewModel extends ViewModel {
 
     /** Stage 5: leave ; ret — decide what RIP lands on */
     private void step3_ret() {
-        _activeLineIndex.setValue(findInCode("}", findInCode("gets(buf);", 0)));
+        setActiveSourceLine(findInCode("}", findInCode("gets(buf);", 0)));
         _statusTitle.setValue("vuln() — leave ; ret");
         _statusType.setValue("info");
 
