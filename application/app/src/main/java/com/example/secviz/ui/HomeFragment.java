@@ -1,5 +1,6 @@
 package com.example.secviz.ui;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -10,10 +11,11 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.secviz.R;
+import com.example.secviz.crypto.CryptoMainActivity;
 
 public class HomeFragment extends Fragment {
 
-    /** Callback interface — only binary exploitation is wired up; crypto is a placeholder. */
+    /** Callback interface for the binary exploitation module. */
     public interface HomeListener {
         void onBinaryExploitationSelected();
     }
@@ -36,13 +38,15 @@ public class HomeFragment extends Fragment {
 
         // Binary Exploitation card → start the module
         view.findViewById(R.id.card_binary_exploitation).setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onBinaryExploitationSelected();
-            }
+            if (listener != null) listener.onBinaryExploitationSelected();
         });
 
-        // Cryptography card → placeholder, no action
+        // Cryptography card → launch crypto module
+        view.findViewById(R.id.card_cryptography).setOnClickListener(v -> {
+            startActivity(new Intent(requireActivity(), CryptoMainActivity.class));
+        });
 
         return view;
     }
 }
+

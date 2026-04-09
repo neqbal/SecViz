@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    crypto_activity_avalanche.xml  —  CryptoAvalanche
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="#0D1117">
+
+    <!-- Toolbar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="#161B22">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="❄️  The Avalanche Effect"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="#C9D1D9"/>
+
+    </LinearLayout>
+
+    <!-- Accent bar: purple -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:background="#A371F7"/>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <!-- Goal description -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#30363D"
+                app:strokeWidth="1dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:text="Goal: Flip exactly 1 plaintext bit and try to flip at least 4 of the 8 ciphertext bits (50% = Avalanche). Toggle S-Box and P-Box to see how they contribute."
+                    android:textColor="#8B949E"
+                    android:textSize="13sp"
+                    android:lineSpacingMultiplier="1.4"/>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Controls card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#30363D"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="CIPHER PARAMETERS"
+                        android:textSize="10sp"
+                        android:textColor="#8B949E"
+                        android:letterSpacing="0.12"
+                        android:paddingBottom="12dp"/>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchSBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Enable S-Box  (Confusion)"
+                        android:textColor="#C9D1D9"
+                        android:textSize="14sp"
+                        android:checked="true"
+                        android:paddingBottom="8dp"/>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchPBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Enable P-Box  (Diffusion)"
+                        android:textColor="#C9D1D9"
+                        android:textSize="14sp"
+                        android:checked="true"
+                        android:paddingBottom="16dp"/>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#30363D"
+                        android:layout_marginBottom="14dp"/>
+
+                    <TextView
+                        android:id="@+id/tvRounds"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Encryption Rounds: 3"
+                        android:textSize="14sp"
+                        android:textColor="#C9D1D9"
+                        android:paddingBottom="8dp"/>
+
+                    <SeekBar
+                        android:id="@+id/seekRounds"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="4"
+                        android:progress="2"
+                        android:progressTint="#A371F7"
+                        android:thumbTint="#A371F7"/>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Plaintext bits card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#30363D"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="PLAINTEXT — tap bits to flip"
+                        android:textSize="10sp"
+                        android:textColor="#8B949E"
+                        android:letterSpacing="0.12"
+                        android:paddingBottom="12dp"/>
+
+                    <LinearLayout
+                        android:id="@+id/layoutPlaintext"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"/>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Ciphertext bits card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#30363D"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="CIPHERTEXT — red = flipped from base"
+                        android:textSize="10sp"
+                        android:textColor="#8B949E"
+                        android:letterSpacing="0.12"
+                        android:paddingBottom="12dp"/>
+
+                    <LinearLayout
+                        android:id="@+id/layoutCiphertext"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"/>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Score -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#30363D"
+                app:strokeWidth="1dp">
+
+                <TextView
+                    android:id="@+id/tvScore"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="Avalanche Score: 0%"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:textColor="#58A6FF"
+                    android:gravity="center"/>
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

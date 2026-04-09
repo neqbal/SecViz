@@ -21,6 +21,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Crypto module activities -->
+        <activity
+            android:name=".crypto.CryptoMainActivity"
+            android:exported="false" />
+        <activity
+            android:name=".crypto.CryptoKeyExchange"
+            android:exported="false" />
+        <activity
+            android:name=".crypto.CryptoHashCollision"
+            android:exported="false" />
+        <activity
+            android:name=".crypto.CryptoAvalanche"
+            android:exported="false" />
     </application>
 
 </manifest>

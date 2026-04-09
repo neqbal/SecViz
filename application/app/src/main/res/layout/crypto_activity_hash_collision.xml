@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    crypto_activity_hash_collision.xml  —  CryptoHashCollision
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="#0D1117">
+
+    <!-- Toolbar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="#161B22">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="💥  Collision Course"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="#C9D1D9"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Hash Collision"
+            android:textSize="11sp"
+            android:textColor="#F85149"
+            android:background="@drawable/bg_badge_danger"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"/>
+
+    </LinearLayout>
+
+    <!-- Accent bar: red -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:background="#F85149"/>
+
+    <!-- Target info panel -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:background="#161B22">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TARGET STRING"
+                android:textSize="10sp"
+                android:textColor="#8B949E"
+                android:letterSpacing="0.1"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="hello_world"
+                android:textSize="14sp"
+                android:textColor="#A5D6FF"
+                android:fontFamily="monospace"/>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TARGET HASH (SHA-13)"
+                android:textSize="10sp"
+                android:textColor="#8B949E"
+                android:letterSpacing="0.1"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1475"
+                android:textSize="14sp"
+                android:textColor="#F85149"
+                android:fontFamily="monospace"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#30363D"/>
+
+    <!-- Instructions -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:text="Write a JavaScript script. The function hash13(str) is available. Your script must return a string (not &#34;hello_world&#34;) that produces the same hash: 1475."
+        android:textColor="#8B949E"
+        android:textSize="13sp"
+        android:lineSpacingMultiplier="1.4"/>
+
+    <!-- Code editor -->
+    <EditText
+        android:id="@+id/etCodeEditor"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:gravity="top|start"
+        android:background="@drawable/bg_code_editor"
+        android:textColor="#C9D1D9"
+        android:textColorHint="#8B949E"
+        android:fontFamily="monospace"
+        android:textSize="13sp"
+        android:padding="14dp"
+        android:text="// Brute-force collision finder:\nvar target = '1475';\nfor(var i = 0; i &lt; 5000; i++) {\n  var attempt = 'test' + i;\n  if (hash13(attempt) === target) {\n    attempt; // last statement returned\n    break;\n  }\n}"/>
+
+    <!-- Run button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnRunCode"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_margin="16dp"
+        android:text="▶  Execute Script"
+        android:textColor="#0D1117"
+        android:textSize="14sp"
+        app:backgroundTint="#F85149"
+        app:cornerRadius="8dp"/>
+
+    <!-- Console output -->
+    <TextView
+        android:id="@+id/tvConsole"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_console"
+        android:padding="12dp"
+        android:fontFamily="monospace"
+        android:textSize="12sp"
+        android:textColor="#3FB950"
+        android:text="> Console Ready..."/>
+
+</LinearLayout>

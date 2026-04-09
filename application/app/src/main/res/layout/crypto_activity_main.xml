@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    crypto_activity_main.xml  —  CryptoMainActivity
+    Dark theme matching the Binary Exploitation module aesthetics.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="#0D1117">
+
+    <!-- ── Toolbar ── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="#161B22">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="CryptoLab"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#C9D1D9"
+            android:letterSpacing="0.02"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Interactive Cryptography Modules"
+            android:textSize="11sp"
+            android:textColor="#8B949E"/>
+
+    </LinearLayout>
+
+    <!-- 1dp border under toolbar -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#30363D"/>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="28dp"
+            android:paddingBottom="48dp">
+
+            <!-- Section label -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="SELECT MODULE"
+                android:textSize="11sp"
+                android:textColor="#8B949E"
+                android:letterSpacing="0.12"
+                android:paddingBottom="16dp"/>
+
+            <!-- ── Card 1: Key Exchange ── -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/crypto_card_key_exchange"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#30363D"
+                app:strokeWidth="1dp"
+                app:rippleColor="#1A58A6FF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Accent bar: blue -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="3dp"
+                        android:background="#58A6FF"/>
+
+                    <!-- Content row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:padding="20dp"
+                        android:gravity="center_vertical">
+
+                        <!-- Icon -->
+                        <TextView
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:text="🎨"
+                            android:textSize="26sp"
+                            android:gravity="center"
+                            android:background="@drawable/bg_module_icon_blue"
+                            android:layout_marginEnd="16dp"/>
+
+                        <!-- Text -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="The Color of Keys"
+                                android:textSize="17sp"
+                                android:textStyle="bold"
+                                android:textColor="#C9D1D9"/>
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Diffie-Hellman key exchange via color mixing analogy"
+                                android:textSize="13sp"
+                                android:textColor="#8B949E"
+                                android:layout_marginTop="4dp"/>
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <!-- Footer: tag + action -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#30363D"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingStart="20dp"
+                        android:paddingEnd="20dp"
+                        android:paddingTop="10dp"
+                        android:paddingBottom="10dp"
+                        android:gravity="end|center_vertical">
+
+                        <Button
+                            android:id="@+id/btnGame1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:text="Play Module 1"
+                            android:textSize="12sp"
+                            android:textColor="#C9D1D9"
+                            android:backgroundTint="#21262D"
+                            android:paddingStart="16dp"
+                            android:paddingEnd="16dp"
+                            style="?attr/materialButtonOutlinedStyle"
+                            app:strokeColor="#30363D"/>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ── Card 2: Hash Collision ── -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/crypto_card_hash_collision"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#30363D"
+                app:strokeWidth="1dp"
+                app:rippleColor="#1AF85149">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Accent bar: red/danger -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="3dp"
+                        android:background="#F85149"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:padding="20dp"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:text="💥"
+                            android:textSize="26sp"
+                            android:gravity="center"
+                            android:background="@drawable/bg_module_icon_red"
+                            android:layout_marginEnd="16dp"/>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Collision Course"
+                                android:textSize="17sp"
+                                android:textStyle="bold"
+                                android:textColor="#C9D1D9"/>
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Exploit a weak 13-bit hash — find a collision via JS"
+                                android:textSize="13sp"
+                                android:textColor="#8B949E"
+                                android:layout_marginTop="4dp"/>
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#30363D"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingStart="20dp"
+                        android:paddingEnd="20dp"
+                        android:paddingTop="10dp"
+                        android:paddingBottom="10dp"
+                        android:gravity="end|center_vertical">
+
+                        <Button
+                            android:id="@+id/btnGame2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:text="Play Module 2"
+                            android:textSize="12sp"
+                            android:textColor="#C9D1D9"
+                            android:backgroundTint="#21262D"
+                            android:paddingStart="16dp"
+                            android:paddingEnd="16dp"
+                            style="?attr/materialButtonOutlinedStyle"
+                            app:strokeColor="#30363D"/>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ── Card 3: Avalanche Effect ── -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/crypto_card_avalanche"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#30363D"
+                app:strokeWidth="1dp"
+                app:rippleColor="#1AA371F7">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Accent bar: purple -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="3dp"
+                        android:background="#A371F7"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:padding="20dp"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:text="❄️"
+                            android:textSize="26sp"
+                            android:gravity="center"
+                            android:background="@drawable/bg_module_icon_purple"
+                            android:layout_marginEnd="16dp"/>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="The Avalanche Effect"
+                                android:textSize="17sp"
+                                android:textStyle="bold"
+                                android:textColor="#C9D1D9"/>
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Flip 1 bit. Watch the chaos. S-Boxes and P-Boxes."
+                                android:textSize="13sp"
+                                android:textColor="#8B949E"
+                                android:layout_marginTop="4dp"/>
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#30363D"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingStart="20dp"
+                        android:paddingEnd="20dp"
+                        android:paddingTop="10dp"
+                        android:paddingBottom="10dp"
+                        android:gravity="end|center_vertical">
+
+                        <Button
+                            android:id="@+id/btnGame3"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:text="Play Module 3"
+                            android:textSize="12sp"
+                            android:textColor="#C9D1D9"
+                            android:backgroundTint="#21262D"
+                            android:paddingStart="16dp"
+                            android:paddingEnd="16dp"
+                            style="?attr/materialButtonOutlinedStyle"
+                            app:strokeColor="#30363D"/>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

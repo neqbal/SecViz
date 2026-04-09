@@ -47,4 +47,7 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
+
+    // Crypto module: JavaScript engine for Hash Collision activity
+    implementation 'org.mozilla:rhino:1.9.1'
 }
