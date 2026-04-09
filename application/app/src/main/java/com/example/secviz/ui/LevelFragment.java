@@ -13,6 +13,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.util.Map;
+
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -73,6 +75,7 @@ public class LevelFragment extends Fragment {
     // Assembly tab UI references
     private RecyclerView rvAsm;
     private TextView tabSource, tabAssembly;
+    private LinearLayout registerPanel;
     private boolean isAsmTabActive = false;
     private int lastSnapshotCount = 0;
     private List<Pair<String, Boolean>> consoleItems = new ArrayList<>();
@@ -107,6 +110,7 @@ public class LevelFragment extends Fragment {
         layoutInput = root.findViewById(R.id.layout_input);
         etInput = root.findViewById(R.id.et_input);
         layoutPresets = root.findViewById(R.id.layout_presets);
+        registerPanel = root.findViewById(R.id.register_panel);
         btnNextStep = root.findViewById(R.id.btn_next_step);
         btnReset = root.findViewById(R.id.btn_reset);
         btnNextStage = root.findViewById(R.id.btn_next_stage);
@@ -127,6 +131,7 @@ public class LevelFragment extends Fragment {
         // ViewModel
         viewModel = new ViewModelProvider(this).get(LevelViewModel.class);
         viewModel.init(level);
+        loadLevelRegisters(level.id); // load pre-calculated register snapshots from assets
 
         // Code RecyclerView
         codeAdapter = new CodeLineAdapter(
@@ -250,13 +255,38 @@ public class LevelFragment extends Fragment {
             tvStatusTitle.setTextColor(color);
         });
 
-        viewModel.step.observe(getViewLifecycleOwner(), s -> {
-            int stepInt = (int)(s * 10);
-            stackCanvas.setStep(s.intValue());
-            boolean waitingForInput = stepInt == 40;
-            layoutInput.setVisibility(waitingForInput ? View.VISIBLE : View.GONE);
-            btnNextStep.setEnabled(!waitingForInput && stepInt != 1000);
-            if (btnNextInstr != null) btnNextInstr.setEnabled(!waitingForInput && stepInt != 1000);
+        // step still drives StackCanvasView visual phase
+        viewModel.step.observe(getViewLifecycleOwner(), s -> stackCanvas.setStep(s.intValue()));
+
+        // waitingForInput drives button gating and input panel visibility
+        viewModel.waitingForInput.observe(getViewLifecycleOwner(), waiting -> {
+            boolean done = Boolean.TRUE.equals(viewModel.step.getValue())
+                    && (int)(viewModel.step.getValue() * 10) == 1000;
+            layoutInput.setVisibility(Boolean.TRUE.equals(waiting) ? View.VISIBLE : View.GONE);
+            btnNextStep.setEnabled(!Boolean.TRUE.equals(waiting) && !done);
+            if (btnNextInstr != null) btnNextInstr.setEnabled(!Boolean.TRUE.equals(waiting) && !done);
+        });
+
+        // Live register panel
+        viewModel.simRegs.observe(getViewLifecycleOwner(), regs -> {
+            if (regs == null || registerPanel == null) return;
+            registerPanel.removeAllViews();
+            for (Map.Entry<String, String> e : regs.entrySet()) {
+                android.widget.TextView tv = new android.widget.TextView(requireContext());
+                String val = e.getValue();
+                // Keep it short: strip leading zeros from 0x000000000040046a → 0x40046a
+                if (val.startsWith("0x") && val.length() > 6) {
+                    String stripped = val.replaceFirst("0x0*", "0x");
+                    if (stripped.equals("0x")) stripped = "0x0";
+                    val = stripped;
+                }
+                tv.setText(e.getKey() + "=" + val);
+                tv.setTextSize(10f);
+                tv.setTextColor(0xFFB0BEC5);
+                tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+                tv.setPadding(8, 0, 12, 0);
+                registerPanel.addView(tv);
+            }
         });
 
         // Assembly cursor observer
@@ -562,4 +592,20 @@ public class LevelFragment extends Fragment {
                 loc[0] + anchor.getWidth() - panel.getMeasuredWidth(),
                 loc[1] + anchor.getHeight() + 8);
     }
+
+    /** Read assets/registers/<levelId>.json and pass its content to the ViewModel. */
+    private void loadLevelRegisters(String levelId) {
+        String filename = "registers/" + levelId + ".json";
+        try (java.io.InputStream is = requireContext().getAssets().open(filename)) {
+            byte[] buf = new byte[is.available()];
+            //noinspection ResultOfMethodCallIgnored
+            is.read(buf);
+            viewModel.loadRegisterJson(new String(buf, java.nio.charset.StandardCharsets.UTF_8));
+        } catch (java.io.FileNotFoundException ignored) {
+            // No register file for this level — silently skip
+        } catch (Exception e) {
+            android.util.Log.w("LevelFragment", "loadLevelRegisters error: " + e.getMessage());
+        }
+    }
 }
+

@@ -125,6 +125,27 @@
 
         </LinearLayout>
 
+        <!-- Live register panel — updates on every ni / n press -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#111318"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/register_panel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:divider="@android:drawable/divider_horizontal_bright"
+                android:showDividers="middle">
+
+                <!-- Chips are created programmatically in LevelFragment -->
+            </LinearLayout>
+        </HorizontalScrollView>
+
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"

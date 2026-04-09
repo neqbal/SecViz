@@ -15,373 +15,938 @@ import com.example.secviz.data.StackBlock;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class LevelViewModel extends ViewModel {
 
-    // Step is a float to allow fractional steps (2.5, 3.5) like the web app
+    // Kept for StackCanvasView.setStep() and RegisterSnapshot compat
     private final MutableLiveData<Float> _step = new MutableLiveData<>(0f);
-    public final LiveData<Float> step = _step;
+    public  final LiveData<Float>         step  = _step;
+
+    // NEW: replaces _step==40 check in Fragment for showing input UI
+    private final MutableLiveData<Boolean> _waitingForInput = new MutableLiveData<>(false);
+    public  final LiveData<Boolean>         waitingForInput  = _waitingForInput;
 
     private final MutableLiveData<Integer> _activeLineIndex = new MutableLiveData<>(0);
-    public final LiveData<Integer> activeLineIndex = _activeLineIndex;
+    public  final LiveData<Integer>         activeLineIndex  = _activeLineIndex;
 
     private final MutableLiveData<List<StackBlock>> _stack = new MutableLiveData<>();
-    public final LiveData<List<StackBlock>> stack = _stack;
+    public  final LiveData<List<StackBlock>>          stack  = _stack;
 
     private final MutableLiveData<Integer> _espIndex = new MutableLiveData<>(0);
-    public final LiveData<Integer> espIndex = _espIndex;
+    public  final LiveData<Integer>         espIndex  = _espIndex;
 
     private final MutableLiveData<Integer> _ebpIndex = new MutableLiveData<>(0);
-    public final LiveData<Integer> ebpIndex = _ebpIndex;
+    public  final LiveData<Integer>         ebpIndex  = _ebpIndex;
 
     private final MutableLiveData<String> _statusTitle = new MutableLiveData<>("Program Ready");
-    public final LiveData<String> statusTitle = _statusTitle;
+    public  final LiveData<String>         statusTitle  = _statusTitle;
 
     private final MutableLiveData<String> _statusDesc = new MutableLiveData<>("Click 'Next Step' to start execution.");
-    public final LiveData<String> statusDesc = _statusDesc;
+    public  final LiveData<String>         statusDesc  = _statusDesc;
 
-    /** "info" | "success" | "warn" | "danger" */
     private final MutableLiveData<String> _statusType = new MutableLiveData<>("info");
-    public final LiveData<String> statusType = _statusType;
+    public  final LiveData<String>         statusType  = _statusType;
 
-    private final MutableLiveData<List<Pair<String, Boolean>>> _consoleOut = new MutableLiveData<>(new ArrayList<>());
-    public final LiveData<List<Pair<String, Boolean>>> consoleOut = _consoleOut;
+    private final MutableLiveData<List<Pair<String,Boolean>>> _consoleOut = new MutableLiveData<>(new ArrayList<>());
+    public  final LiveData<List<Pair<String,Boolean>>>          consoleOut  = _consoleOut;
 
     private final MutableLiveData<Boolean> _isPatched = new MutableLiveData<>(false);
-    public final LiveData<Boolean> isPatched = _isPatched;
+    public  final LiveData<Boolean>         isPatched   = _isPatched;
 
-    /** Fires a one-shot toast message. Pair<message, isSuccess> */
-    private final MutableLiveData<Pair<String, Boolean>> _toast = new MutableLiveData<>();
-    public final LiveData<Pair<String, Boolean>> toast = _toast;
+    private final MutableLiveData<Pair<String,Boolean>> _toast = new MutableLiveData<>();
+    public  final LiveData<Pair<String,Boolean>>          toast  = _toast;
 
     private final MutableLiveData<String> _userInput = new MutableLiveData<>("");
-    public final LiveData<String> userInput = _userInput;
+    public  final LiveData<String>         userInput  = _userInput;
 
-    /** Hex dump rows derived from the live stack. List of HexRow-like bundles as raw objects
-     *  to avoid a circular import — encoded as Object[] { address:String, bytes:byte[], status:int[] } */
     private final MutableLiveData<List<Object[]>> _hexRows = new MutableLiveData<>(new ArrayList<>());
-    public final LiveData<List<Object[]>> hexRows = _hexRows;
+    public  final LiveData<List<Object[]>>          hexRows  = _hexRows;
 
-    /** Register state snapshots — one per executed step, for the timeline UI */
-    private final MutableLiveData<List<RegisterSnapshot>> _snapshots =
-            new MutableLiveData<>(new ArrayList<>());
-    public final LiveData<List<RegisterSnapshot>> snapshots = _snapshots;
+    private final MutableLiveData<List<RegisterSnapshot>> _snapshots = new MutableLiveData<>(new ArrayList<>());
+    public  final LiveData<List<RegisterSnapshot>>          snapshots  = _snapshots;
     private int snapshotCount = 0;
 
-    /** The timeline index currently being viewed/simulated. Allows scrubbing time without deleting the future. */
     private final MutableLiveData<Integer> _activeSnapshotIndex = new MutableLiveData<>(-1);
-    public final LiveData<Integer> activeSnapshotIndex = _activeSnapshotIndex;
-    
-    // Feature Toggles (from Burger Menu)
+    public  final LiveData<Integer>         activeSnapshotIndex  = _activeSnapshotIndex;
+
     private final MutableLiveData<Boolean> _captureEnabled = new MutableLiveData<>(false);
-    public final LiveData<Boolean> captureEnabled = _captureEnabled;
+    public  final LiveData<Boolean>         captureEnabled  = _captureEnabled;
 
     private final MutableLiveData<Boolean> _timelineVisible = new MutableLiveData<>(false);
-    public final LiveData<Boolean> timelineVisible = _timelineVisible;
+    public  final LiveData<Boolean>         timelineVisible  = _timelineVisible;
 
-    /** Level 2B: fires true when execution reaches gets() — tells LevelFragment to show the dialog */
     private final MutableLiveData<Boolean> _getsReached = new MutableLiveData<>(false);
-    public final LiveData<Boolean> getsReached = _getsReached;
+    public  final LiveData<Boolean>         getsReached  = _getsReached;
 
-    // ── Assembly / ni state ──────────────────────────────────────────────────
-    /** Flat list of all AsmLine objects parsed from level.objdump on init. */
-    private List<AsmLine> asmFlat = new ArrayList<>();
+    // NEW: live simulated registers for the auto-updating register panel
+    private final MutableLiveData<Map<String,String>> _simRegs = new MutableLiveData<>();
+    public  final LiveData<Map<String,String>>          simRegs  = _simRegs;
 
-    /** address (hex, no 0x) → flat-list index */
-    private final Map<String, Integer> addrToAsmIdx = new HashMap<>();
+    // ── Assembly state ───────────────────────────────────────────────────────
+    private List<AsmLine>       asmFlat         = new ArrayList<>();
+    private final Map<String,Integer> addrToAsmIdx    = new HashMap<>();
+    private final Map<Integer,String> srcLineToFirstAddr = new HashMap<>();
+    private final Map<String,Integer> addrToSrcLine   = new HashMap<>();
 
-    /** C-source line index → first asm address for that line */
-    private final Map<Integer, String> srcLineToFirstAddr = new HashMap<>();
+    /** Index of the NEXT instruction to execute (currently highlighted). -1 = not ready. */
+    private int pendingAsmIdx = -1;
 
-    /** asm address → C-source line index */
-    private final Map<String, Integer> addrToSrcLine = new HashMap<>();
-
-    /** Currently highlighted assembly instruction index (-1 = no asm available) */
-    private int activeAsmIdx = -1;
-
-    /** Exposed to UI — drives Assembly tab highlighting and scroll */
     private final MutableLiveData<Integer> _activeAsmInstrIdx = new MutableLiveData<>(-1);
     public  final LiveData<Integer>         activeAsmInstrIdx  = _activeAsmInstrIdx;
+
+    // ── Execution state ──────────────────────────────────────────────────────
+    private boolean execWaiting  = false; // local mirror of _waitingForInput
+    private boolean isTerminal   = false; // program has ended
+
+    // ── Simulated register strings kept for ROP win-condition check ─────────
+    private String rop_rax = "0x0000000000000000";
+    private String rop_rdi = "0x0000000000000000";
+    private String rop_rsi = "0x0000000000000000";
+    private String rop_rdx = "0x0000000000000000";
+    private String rop_rip = "main";
+    private List<String> ropPayload  = new ArrayList<>();
+    private int ropPayloadPos = 0;
+    private int ropEspIdx     = -1;
+    private int ropHopCount   = 0;
+
+    // ── General-purpose register simulation (display only) ────────────────────
+    // Tracks all 9 visible registers by parsing asm instruction text.
+    // Does NOT affect execution flow — purely for the register panel.
+    private final Map<String, Long> simGPR = new LinkedHashMap<>();
+
+    // ── Level data ───────────────────────────────────────────────────────────
+    private Level level;
+    private int   initialEsp = 0;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Init / Reset
+    // ─────────────────────────────────────────────────────────────────────────
 
     public void toggleCaptureEnabled() {
         _captureEnabled.setValue(!Boolean.TRUE.equals(_captureEnabled.getValue()));
     }
-
     public void toggleTimelineVisible() {
         _timelineVisible.setValue(!Boolean.TRUE.equals(_timelineVisible.getValue()));
     }
 
-    private Level level;
-    private int initialEsp = 0;
-
-    // ── Level 3 ROP simulation state ────────────────────────────────────────
-    private String rop_rdi = "0x0000000000000000";
-    private String rop_rsi = "0x0000000000000000";
-    private String rop_rdx = "0x0000000000000000";
-    private String rop_rax = "0x0000000000000000";
-    private String rop_rip = "main";
-    // Stack pointer index used by the gadget-hopper (advances as we 'pop')
-    private int ropEspIdx = -1;
-    // The resolved payload addresses in order (filled by submitRopPayload)
-    private List<String> ropPayload = new ArrayList<>();
-    private int ropPayloadPos = 0; // current pos in ropPayload (RIP = ropPayload[ropPayloadPos])
-    private int ropHopCount  = 0; // counts each gadget execution for the GDB "hop #N" header
-
-    // ── Level Initialization ──────────────────────────────────────────────────
-
     public void init(Level lvl) {
         this.level = lvl;
         this.initialEsp = findInitialEsp(lvl);
-        reset();
         buildAsmMaps();
+        reset();
     }
 
     private int findInitialEsp(Level lvl) {
         for (int i = 0; i < lvl.initialStack.size(); i++) {
             String lbl = lvl.initialStack.get(i).label;
-            if (lbl.contains("main Saved EBP") || lbl.contains("main Frame Data")) {
-                return i;
-            }
+            if (lbl.contains("main Saved EBP") || lbl.contains("main Frame Data")) return i;
         }
         return 0;
     }
 
     public void reset() {
         _step.setValue(0f);
+        _waitingForInput.setValue(false);
+        execWaiting = false;
+        isTerminal  = false;
         _activeLineIndex.setValue(level.startCodeLine);
         _stack.setValue(deepCopyStack(level.initialStack));
         updateHexDump();
         _espIndex.setValue(initialEsp);
         _ebpIndex.setValue(initialEsp);
         _statusTitle.setValue("Program Ready");
-        _statusDesc.setValue("Click 'Next Step' to start execution.");
+        _statusDesc.setValue("Highlighted instruction is NEXT to execute. Press ni or n.");
         _statusType.setValue("info");
         _consoleOut.setValue(new ArrayList<>());
         _userInput.setValue("");
-        _isPatched.setValue(Boolean.TRUE.equals(_isPatched.getValue())); // preserve patch state
-        // Clear timeline
+        _isPatched.setValue(Boolean.TRUE.equals(_isPatched.getValue()));
         _activeSnapshotIndex.setValue(-1);
         snapshotCount = 0;
         _snapshots.setValue(new ArrayList<>());
-        // Reset ROP simulation registers
+        rop_rax = "0x0000000000000000";
         rop_rdi = "0x0000000000000000";
         rop_rsi = "0x0000000000000000";
         rop_rdx = "0x0000000000000000";
-        rop_rax = "0x0000000000000000";
         rop_rip = "main";
         ropPayload.clear();
         ropPayloadPos = 0;
-        ropEspIdx = -1;
-        ropHopCount = 0;
+        ropEspIdx     = -1;
+        ropHopCount   = 0;
+        initSimGPR();  // reset register display state
         recordSnapshot("Program Ready", "main");
-        // Reset assembly cursor
-        activeAsmIdx = -1;
+        // Restore asm cursor to start line
+        pendingAsmIdx = -1;
         _activeAsmInstrIdx.setValue(-1);
-        // Sync to start line if maps are already built
-        syncAsmToSourceLine(level.startCodeLine);
+        syncPendingToSourceLine(level.startCodeLine);
+        emitSimRegs();
     }
 
-    public void setUserInput(String input) {
-        _userInput.setValue(input);
+    public void setUserInput(String input) { _userInput.setValue(input); }
+    public void togglePatch()   { _isPatched.setValue(!Boolean.TRUE.equals(_isPatched.getValue())); }
+    public boolean isPatched()  { return Boolean.TRUE.equals(_isPatched.getValue()); }
+    public Level   getLevel()   { return level; }
+    public float   getStep()    { Float v = _step.getValue(); return v == null ? 0 : v; }
+    public List<StackBlock> getStack() { return _stack.getValue(); }
+    public List<AsmLine>    getAsmFlat() { return asmFlat; }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GDB-style execution — ni (Next Instruction)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Execute the currently highlighted (pending) instruction, then advance the
+     * highlight to the next instruction. The highlighted instruction is the NEXT
+     * one to run — it has NOT executed yet.
+     */
+    public void handleNextInstruction() {
+        if (execWaiting || isTerminal) return;
+        if (pendingAsmIdx < 0 || pendingAsmIdx >= asmFlat.size()) return;
+
+        AsmLine toExec = asmFlat.get(pendingAsmIdx);
+        int nextIdx = dispatchAndGetNext(toExec);
+        updateRegistersForInstr(toExec.rawText); // visual register update
+
+        if (!execWaiting && !isTerminal) {
+            nextIdx = skipToNextRealInstr(nextIdx);
+            pendingAsmIdx = nextIdx;
+            _activeAsmInstrIdx.setValue(pendingAsmIdx);
+            syncSourceToAsm();
+            emitSimRegs();
+        }
+        recordSnapshot(_statusTitle.getValue() == null ? "" : _statusTitle.getValue(),
+                pendingAsmIdx < asmFlat.size() ? asmFlat.get(pendingAsmIdx).address : "?");
     }
 
-    public void togglePatch() {
-        _isPatched.setValue(!Boolean.TRUE.equals(_isPatched.getValue()));
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // GDB-style execution — n (Next Source Line)
+    // ─────────────────────────────────────────────────────────────────────────
 
-    public boolean isPatched() {
-        return Boolean.TRUE.equals(_isPatched.getValue());
-    }
-
-    public Level getLevel() {
-        return level;
-    }
-
-    public float getStep() {
-        Float v = _step.getValue();
-        return v == null ? 0 : v;
-    }
-
-    public List<StackBlock> getStack() {
-        return _stack.getValue();
-    }
-
-    // ── Step Execution Engine ─────────────────────────────────────────────────
-
+    /**
+     * Execute all assembly instructions belonging to the currently highlighted
+     * C source line, then advance the C source highlight to the next line.
+     */
     public void handleNextStep() {
-        float currentStep = getStep();
-        boolean patched = isPatched();
-        String input = _userInput.getValue() == null ? "" : _userInput.getValue();
+        if (execWaiting || isTerminal) return;
+        if (pendingAsmIdx < 0 || pendingAsmIdx >= asmFlat.size()) return;
 
-        // Level 2B has its own step engine
-        if ("2b".equals(level.id)) {
-            handle2bNextStep(currentStep);
-            return;
-        }
+        Integer curSrc = addrToSrcLine.get(asmFlat.get(pendingAsmIdx).address);
 
-        // Level 3 has its own step engine
-        if ("3".equals(level.id)) {
-            handle3NextStep(currentStep);
-            return;
-        }
+        // Execute until we land on a different (non-null) source line
+        do {
+            AsmLine toExec = asmFlat.get(pendingAsmIdx);
+            // Track the mnemonic BEFORE dispatch (needed for gadget-territory break)
+            String mnemBeforeDispatch = extractMnem(
+                    toExec.rawText.toLowerCase(java.util.Locale.US));
 
-        switch ((int)(currentStep * 10)) { // multiply by 10 to handle 2.5→25, 3.5→35
-            case 0:  step0(input, patched); break;
-            case 10: step1(patched); break;
-            case 20: step2(); break;
-            case 25: step2_5(); break;
-            case 30: step3(patched); break;
-            case 35: step3_5(patched); break;
-            // step 4 = waiting for input, handled by submitInput()
-            case 50: step5(input, patched); break;
-            case 60: step6(input, patched); break;
-            case 70: step7(); break;
-            case 80: step8(input, patched); break;
+            int nextIdx = dispatchAndGetNext(toExec);
+            updateRegistersForInstr(toExec.rawText); // visual register update
+            if (execWaiting || isTerminal) break;
+
+            nextIdx = skipToNextRealInstr(nextIdx);
+            if (nextIdx >= asmFlat.size()) { isTerminal = true; break; }
+
+            pendingAsmIdx = nextIdx;
+            _activeAsmInstrIdx.setValue(pendingAsmIdx);
+
+            Integer newSrc = addrToSrcLine.get(asmFlat.get(pendingAsmIdx).address);
+            // Stop when we arrive at a known, different source line
+            if (newSrc != null && !newSrc.equals(curSrc)) break;
+            // In gadget territory (no src line on either side): keep going until after
+            // a ret instruction fires — that completes one full gadget and lands on the
+            // next one. Stopping at pop rdi would leave the ret unexecuted.
+            if (newSrc == null && curSrc == null && "ret".equals(mnemBeforeDispatch)) break;
+        } while (!execWaiting && !isTerminal);
+
+        if (!execWaiting) {
+            syncSourceToAsm();
+            emitSimRegs();
         }
+        recordSnapshot(_statusTitle.getValue() == null ? "" : _statusTitle.getValue(),
+                pendingAsmIdx < asmFlat.size() ? asmFlat.get(pendingAsmIdx).address : "?");
     }
 
-    private void step0(String input, boolean patched) {
-        int nextIdx = level.startCodeLine + 1;
-        setActiveSourceLine(nextIdx);
-        String lineText = level.code.get(nextIdx).text;
-        if (lineText.contains("puts")) {
-            addConsole("I will echo whatever you say.", false);
-            _statusTitle.setValue("Executing puts()");
-            _step.setValue(1f);
-            recordSnapshot("puts() in main", "puts@plt");
-        } else {
-            _statusTitle.setValue("Calling vuln()");
-            pushReturnAddr(patched);
+    // ─────────────────────────────────────────────────────────────────────────
+    // Instruction Dispatch Engine
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Apply the simulation effects of {@code instr} and return the index of the
+     * next instruction to highlight (= the new pendingAsmIdx).
+     * Returns {@code pendingAsmIdx} unchanged when execution must pause.
+     */
+    private int dispatchAndGetNext(AsmLine instr) {
+        String raw = instr.rawText.toLowerCase(java.util.Locale.US);
+
+        // ── CALL ─────────────────────────────────────────────────────────────
+        if (instr.callTarget != null || raw.contains("call ")) {
+            return handleCall(instr, raw);
+        }
+
+        String mnem = extractMnem(raw);
+        if (mnem == null) return pendingAsmIdx + 1;
+
+        switch (mnem) {
+            case "push":
+                if (raw.contains("rbp") || raw.contains("ebp")) simulatePushRbp();
+                break;
+            case "mov":
+                if (raw.contains("rbp,rsp") || raw.contains("ebp,esp")) simulateMovRbpRsp();
+                break;
+            case "sub":
+                if (raw.contains("rsp,") || raw.contains("esp,")) simulateSubRsp(raw);
+                break;
+            case "leave":
+                simulateLeave();
+                break;
+            case "ret":
+                return simulateRet();
+            case "pop":
+                simulatePop(raw);
+                break;
+            case "syscall":
+                simulateSyscall();
+                isTerminal = true;
+                return pendingAsmIdx;
+            default:
+                break; // no effect, just advance
+        }
+        return pendingAsmIdx + 1;
+    }
+
+    private int handleCall(AsmLine instr, String raw) {
+        // gets@plt (Levels 2B/3) — pause and show the payload/ROP dialog
+        if (raw.contains("gets@plt") || raw.contains("<gets")) {
+            execWaiting = true;
+            _waitingForInput.setValue(true);
+            _getsReached.setValue(true);  // ← triggers showGetsTriggerDialog in Fragment
+            _step.setValue(4f);
+            _statusTitle.setValue("gets() — Awaiting Input");
+            _statusType.setValue("warn");
+            _statusDesc.setValue("gets() reads from stdin with NO bounds check. Choose how to respond.");
+            return pendingAsmIdx;
+        }
+
+        // read@plt (Levels 1/2A) — pause and show simple input layout (no payload dialog)
+        if (raw.contains("read@plt") || raw.contains("<read")) {
+            execWaiting = true;
+            _waitingForInput.setValue(true);
+            // Do NOT fire _getsReached — Fragment's waitingForInput observer shows layoutInput directly
+            _step.setValue(4f);
+            _statusTitle.setValue("read() — Awaiting Input");
+            _statusType.setValue("warn");
+            String desc = isPatched()
+                    ? "read() is bounded to 16 bytes — safe input only."
+                    : "read() reads up to 100 bytes into a 16-byte buffer. Overflow it!";
+            if ("2a".equals(level.id)) {
+                desc = isPatched()
+                        ? "read() bounded to 15 bytes + null-terminator — secret protected."
+                        : "read() reads 16 bytes with no null-terminator. Fill exactly 16 to leak the secret!";
+            }
+            _statusDesc.setValue(desc);
+            return pendingAsmIdx;
+        }
+
+        // puts@plt → print quoted string from C source line to console
+        if (raw.contains("puts@plt") || raw.contains("<puts")) {
+            simulatePuts(raw);
+            return pendingAsmIdx + 1;
+        }
+
+        // printf@plt
+        if (raw.contains("printf@plt") || raw.contains("<printf")) {
+            simulatePrintf();
+            return pendingAsmIdx + 1;
+        }
+
+        // win() detection for Level 2B — reached via normal call before ret
+        String target = instr.callTarget != null ? instr.callTarget : "";
+        if (raw.contains("<win>") || target.equals("400476")) {
+            simulateWin2b();
+            isTerminal = true;
+            return pendingAsmIdx;
+        }
+
+        // Local function call → enter it
+        Integer targetIdx = addrToAsmIdx.get(target);
+        if (targetIdx != null) {
+            simulateCallPushReturnAddr();
+            String funcName = extractFuncName(raw);
+            _statusTitle.setValue("call " + funcName);
+            _statusDesc.setValue("CPU pushes return address onto the stack and jumps to " + funcName + ".");
             _step.setValue(2f);
-            recordSnapshot("call vuln()", "vuln");
+            return skipToNextRealInstr(targetIdx);
         }
+
+        // Unknown PLT stub: skip (simulate transparent return)
+        return pendingAsmIdx + 1;
     }
 
-    private void step1(boolean patched) {
-        int callIdx = findInCode("vuln();", level.startCodeLine);
-        setActiveSourceLine(callIdx);
-        _statusTitle.setValue("Calling vuln()");
-        pushReturnAddr(patched);
-        _step.setValue(2f);
-        recordSnapshot("call vuln()", "vuln");
-    }
+    // ── Instruction simulation helpers ────────────────────────────────────────
 
-    private void pushReturnAddr(boolean patched) {
+    private void simulatePushRbp() {
+        int newEsp = getEspIdx() + 1;
         List<StackBlock> s = deepCopyStack(getStack());
-        int retIdx = initialEsp + 1;
-        if (retIdx < s.size()) {
-            s.get(retIdx).value = level.id.equals("1") ? "0x400490" : "0x4004ec";
+        if (newEsp < s.size()) {
+            StackBlock b = s.get(newEsp);
+            // Only write to a truly empty slot — leave all pre-populated frame slots untouched.
+            // This prevents main()'s push rbp from corrupting "main Ret Addr" (which already
+            // holds the correct return-to-libc value and is needed by the ROP chain).
+            boolean isEmpty = b.type.equals(StackBlock.TYPE_NEUTRAL)
+                    || b.value.equals("0x0") || b.value.equals("0x...") || b.value.isEmpty();
+            if (isEmpty) {
+                b.value = formatHex(parseRbpValue());
+                b.type  = StackBlock.TYPE_SAFE;
+                _stack.setValue(s);
+                updateHexDump();
+            }
         }
-        _stack.setValue(s);
-        updateHexDump();
-        _espIndex.setValue(retIdx);
+        _espIndex.setValue(newEsp); // always track RSP movement
+        _statusTitle.setValue("push rbp");
+        _statusDesc.setValue("Saves caller's base pointer on the stack. RSP decrements by 8.");
     }
 
-    private void step2() {
-        int firstVarIdx = -1;
-        for (int i = 0; i < level.code.size(); i++) {
-            String t = level.code.get(i).text;
-            if (t.contains("char secret_key") || t.contains("long fs_canary") || t.contains("char buff")) {
-                firstVarIdx = i;
+    private void simulateMovRbpRsp() {
+        _ebpIndex.setValue(getEspIdx());
+        _statusTitle.setValue("mov rbp, rsp");
+        _statusDesc.setValue("Sets the new frame pointer equal to the current stack pointer.");
+    }
+
+    private void simulateSubRsp(String raw) {
+        java.util.regex.Matcher m =
+                java.util.regex.Pattern.compile(",0[xX]([0-9a-fA-F]+)").matcher(raw);
+        if (m.find()) {
+            int n      = (int) Long.parseLong(m.group(1), 16);
+            int blocks = n / 8;
+            _espIndex.setValue(Math.min(getEspIdx() + blocks, safeStackMax()));
+            _statusTitle.setValue("sub rsp, 0x" + Integer.toHexString(n));
+            _statusDesc.setValue("Allocates " + n + " bytes on the stack for local variables.");
+        }
+    }
+
+    private void simulateLeave() {
+        // leave = mov rsp,rbp ; pop rbp
+        int ebp = getEbpIdx();
+        _espIndex.setValue(ebp);        // mov rsp, rbp
+        _espIndex.setValue(ebp - 1);    // pop rbp (RSP += 8 → espIndex--)
+        _statusTitle.setValue("leave — restore stack frame");
+        _statusDesc.setValue("mov rsp, rbp restores RSP. pop rbp restores the caller's frame pointer.");
+        _step.setValue(5f);
+    }
+
+    private int simulateRet() {
+        List<StackBlock> s = getStack();
+        int esp = getEspIdx();
+        if (s == null || esp < 0 || esp >= s.size()) { isTerminal = true; return pendingAsmIdx; }
+
+        StackBlock retBlock = s.get(esp);
+        String retVal  = retBlock.value;
+        _espIndex.setValue(esp - 1); // pop = RSP += 8 = espIndex--
+
+        // Normalize: strip "0x" prefix and leading zeros before lookup
+        // (e.g. "0x000000000040046a" → "40046a").
+        String retAddr = retVal.replace("0x","").replace("0X","")
+                               .replaceAll("[^0-9a-fA-F]","").toLowerCase(java.util.Locale.US).trim();
+        // Strip leading zeros so the key matches addrToAsmIdx (which stores bare hex)
+        retAddr = retAddr.replaceFirst("^0+([0-9a-fA-F])", "$1");
+
+        Integer targetFlatIdx = addrToAsmIdx.get(retAddr);
+
+        if (targetFlatIdx == null) {
+            // Corrupted / unknown address
+            boolean corrupted = retBlock.type.equals(StackBlock.TYPE_DANGER)
+                             || retBlock.type.equals(StackBlock.TYPE_JUNK)
+                             || retBlock.type.equals(StackBlock.TYPE_TARGET)
+                             || (!retVal.startsWith("0x") && !retVal.isEmpty());
+            if (corrupted || !retVal.startsWith("0x")) {
+                _statusTitle.setValue("Segmentation Fault!");
+                _statusType.setValue("danger");
+                _statusDesc.setValue("RIP → " + retVal + " is not valid. SIGSEGV.");
+                addConsole("[1]    killed  Segmentation fault", false);
+                if (level != null && "CRASH".equals(level.goal)) triggerWin(false);
+                _step.setValue(100f);
+                isTerminal = true;
+                return pendingAsmIdx;
+            }
+            isTerminal = true;
+            _step.setValue(100f);
+            _statusTitle.setValue("Program exited");
+            return pendingAsmIdx;
+        }
+
+        // Successful jump — determine context
+        if ("2b".equals(level.id) && retAddr.equals("400476")) {
+            // Level 2B: jumped to win()!
+            _statusTitle.setValue("RIP hijacked → win()!");
+            _statusType.setValue("success");
+            _statusDesc.setValue("leave ; ret loaded 0x400476. Jumping to win().");
+            _step.setValue(6f);
+        } else if (!ropPayload.isEmpty()) {
+            // Level 3: ROP chain hop
+            _statusTitle.setValue("ret → ROP gadget " + retVal);
+            _statusType.setValue("info");
+            _step.setValue(6f);
+        } else {
+            // Normal return
+            _statusTitle.setValue("ret — returned to caller");
+            _statusType.setValue("success");
+            _statusDesc.setValue("Stack frame cleaned up. RIP = " + retVal + ".");
+            _step.setValue(7f);
+        }
+        return skipToNextRealInstr(targetFlatIdx);
+    }
+
+    private void simulatePop(String raw) {
+        List<StackBlock> s = getStack();
+        int esp = getEspIdx();
+        String val = (s != null && esp >= 0 && esp < s.size()) ? s.get(esp).value : "0x0";
+        _espIndex.setValue(esp - 1);
+
+        String regName = "";
+        if (raw.contains("pop") && raw.contains("rax")) { rop_rax = val; regName = "RAX"; }
+        else if (raw.contains("pop") && raw.contains("rdi")) { rop_rdi = val; regName = "RDI"; }
+        else if (raw.contains("pop") && raw.contains("rsi")) { rop_rsi = val; regName = "RSI"; }
+        else if (raw.contains("pop") && raw.contains("rdx")) { rop_rdx = val; regName = "RDX"; }
+        // pop rbp: just advance esp, no register to update in sim
+
+        if (!regName.isEmpty()) {
+            _statusTitle.setValue("pop " + regName.toLowerCase(java.util.Locale.US));
+            _statusType.setValue("info");
+            _statusDesc.setValue(regName + " ← " + val);
+            // emit GDB console line for ROP chain visibility
+            if (!ropPayload.isEmpty()) {
+                String H = "────────────────────────────";
+                ropHopCount++;
+                addConsole("", false);
+                addConsole(H + "[ Gadget #" + ropHopCount + " ]" + H, false);
+                addConsole(" ►  " + asmFlat.get(pendingAsmIdx).address
+                           + "    pop " + regName.toLowerCase(java.util.Locale.US), false);
+                addConsole("   " + regName + " ← " + val, false);
+            }
+        }
+    }
+
+    private void simulateSyscall() {
+        List<StackBlock> stk = deepCopyStack(getStack());
+        execSyscall(pendingAsmIdx < asmFlat.size()
+                ? "0x" + asmFlat.get(pendingAsmIdx).address : "0x40048e", stk);
+        _step.setValue(100f);
+    }
+
+    private void simulateCallPushReturnAddr() {
+        List<StackBlock> s = deepCopyStack(getStack());
+        int newEsp = getEspIdx() + 1;
+        // Return address = instruction right after the call
+        int retInstIdx = skipToNextRealInstr(pendingAsmIdx + 1);
+        String retAddr = retInstIdx < asmFlat.size() ? "0x" + asmFlat.get(retInstIdx).address : "0x0";
+        if (newEsp < s.size()) {
+            s.get(newEsp).value = retAddr;
+            s.get(newEsp).type  = StackBlock.TYPE_SAFE;
+        }
+        _stack.setValue(s); updateHexDump();
+        _espIndex.setValue(newEsp);
+    }
+
+    private void simulatePuts(String raw) {
+        // Try to get the string from the corresponding C source line
+        String curAddr = asmFlat.get(pendingAsmIdx).address;
+        Integer srcLine = addrToSrcLine.get(curAddr);
+        if (srcLine != null && level != null && srcLine < level.code.size()) {
+            String lineText = level.code.get(srcLine).text;
+            String quoted = extractQuoted(lineText);
+            if (!quoted.isEmpty()) {
+                addConsole(quoted, false);
+                _statusTitle.setValue("puts()");
+                _statusDesc.setValue("Printed: \"" + quoted + "\"");
+                return;
+            }
+        }
+        // win() puts for Level 2B (RIP jumped to win, now executing puts inside it)
+        if ("2b".equals(level.id) && (raw.contains("puts@plt") || raw.contains("<puts"))) {
+            addConsole("SHELL OBTAINED — flag{ctrl_flow_h1jack}", false);
+            _statusTitle.setValue("puts() — flag printed!");
+            _statusType.setValue("success");
+        }
+    }
+
+    private void simulatePrintf() {
+        String input   = _userInput.getValue() == null ? "" : _userInput.getValue();
+        boolean patched = isPatched();
+        int maxLen = "2a".equals(level.id) ? (patched ? 15 : 16) : 100;
+        String out = input.substring(0, Math.min(maxLen, input.length()));
+        addConsole(out, false);
+        boolean shouldLeak = !patched && input.length() >= 16;
+        if ("2a".equals(level.id) && shouldLeak) addConsole("SUPER_SECRET_KEY", true);
+        _statusTitle.setValue("printf()");
+    }
+
+    private void simulateWin2b() {
+        addConsole("SHELL OBTAINED — flag{ctrl_flow_h1jack}", false);
+        _statusTitle.setValue("win() — RIP hijack succeeded!");
+        _statusType.setValue("success");
+        _statusDesc.setValue("Execution jumped to win(). Flag printed!");
+        _toast.setValue(new Pair<>("💥 Shell obtained! flag{ctrl_flow_h1jack}", false));
+        _step.setValue(100f);
+    }
+
+    // ── Dispatch helpers ──────────────────────────────────────────────────────
+
+    private String extractMnem(String raw) {
+        int colon = raw.indexOf(':');
+        if (colon < 0) return null;
+        String rest = raw.substring(colon + 1).trim();
+        String[] parts = rest.split("\\s{2,}");
+        if (parts.length < 2) return null;
+        String instrPart = parts[1].trim();
+        int sp = instrPart.indexOf(' ');
+        return (sp > 0 ? instrPart.substring(0, sp) : instrPart).trim();
+    }
+
+    private String extractFuncName(String raw) {
+        java.util.regex.Matcher m =
+                java.util.regex.Pattern.compile("<([^>]+)>").matcher(raw);
+        return m.find() ? m.group(1) : "function";
+    }
+
+    private int skipToNextRealInstr(int from) {
+        while (from < asmFlat.size()) {
+            AsmLine a = asmFlat.get(from);
+            if (!a.isHeader && !a.address.isEmpty()) return from;
+            from++;
+        }
+        return from;
+    }
+
+    private int getEspIdx() { Integer v = _espIndex.getValue(); return v == null ? 0 : v; }
+    private int getEbpIdx() { Integer v = _ebpIndex.getValue(); return v == null ? 0 : v; }
+    private int safeStackMax() {
+        List<StackBlock> s = getStack(); return s == null ? 0 : s.size() - 1;
+    }
+
+    private long parseRbpValue() {
+        List<StackBlock> s = getStack();
+        int ebp = getEbpIdx();
+        if (s != null && ebp >= 0 && ebp < s.size()) return parseAddr(s.get(ebp).address);
+        return 0x7fff0L;
+    }
+
+    private String formatHex(long val) { return String.format("0x%x", val); }
+
+    private void syncPendingToSourceLine(int srcIdx) {
+        String addr = srcLineToFirstAddr.get(srcIdx);
+        if (addr == null) return;
+        Integer flatIdx = addrToAsmIdx.get(addr);
+        if (flatIdx == null) return;
+        pendingAsmIdx = flatIdx;
+        _activeAsmInstrIdx.setValue(flatIdx);
+    }
+
+    private void syncSourceToAsm() {
+        if (pendingAsmIdx < 0 || pendingAsmIdx >= asmFlat.size()) return;
+        String addr   = asmFlat.get(pendingAsmIdx).address;
+        Integer srcLine = addrToSrcLine.get(addr);
+        if (srcLine != null) _activeLineIndex.setValue(srcLine);
+    }
+
+    /**
+     * Per-instruction register override map.
+     * Key = instruction address (bare hex, no 0x, e.g. "40047f").
+     * Value = register map, keys must be upper-case: "RAX","RDI","RSI","RDX","RSP","RBP","RIP".
+     *
+     * When pendingAsmIdx points to an address present in this map, emitSimRegs() uses
+     * those values instead of the default tracked values.
+     *
+     * Call this during level init or at any time to hardcode accurate register values.
+     * Example:
+     *   Map<String,String> regs = new LinkedHashMap<>();
+     *   regs.put("RSP", "0x7ffc0");  regs.put("RBP", "0x7ffd0");
+     *   viewModel.defineInstrRegs("40047f", regs);
+     */
+    private final Map<String, Map<String,String>> instrRegOverrides = new HashMap<>();
+
+    public void defineInstrRegs(String hexAddr, Map<String,String> regs) {
+        instrRegOverrides.put(hexAddr.toLowerCase(java.util.Locale.US).replace("0x",""), regs);
+    }
+
+
+    /**
+     * Load pre-calculated register snapshots from a JSON string (asset file content).
+     * Format: { "ADDRESS_HEX": { "RAX":"0x...", "RSP":"0x...", ... }, ... }
+     * Keys beginning with '_' are treated as comments and ignored.
+     * Call from LevelFragment after init(), passing contents of
+     * assets/registers/<levelId>.json.
+     */
+    public void loadRegisterJson(String json) {
+        if (json == null || json.isEmpty()) return;
+        instrRegOverrides.clear();
+        try {
+            org.json.JSONObject root = new org.json.JSONObject(json);
+            java.util.Iterator<String> addrs = root.keys();
+            while (addrs.hasNext()) {
+                String addr = addrs.next().toLowerCase(java.util.Locale.US);
+                if (addr.startsWith("_")) continue;
+                Object val = root.get(addr);
+                if (!(val instanceof org.json.JSONObject)) continue;
+                org.json.JSONObject regObj = (org.json.JSONObject) val;
+                Map<String, String> regMap = new LinkedHashMap<>();
+                java.util.Iterator<String> regs = regObj.keys();
+                while (regs.hasNext()) {
+                    String reg = regs.next().toUpperCase(java.util.Locale.US);
+                    if (reg.startsWith("_")) continue; // skip _note, _comment
+                    regMap.put(reg, regObj.getString(reg));
+                }
+                if (!regMap.isEmpty()) instrRegOverrides.put(addr, regMap);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("LevelVM", "loadRegisterJson error: " + e.getMessage());
+        }
+    }
+
+    /** Push current simulated registers to LiveData for the auto-updating register panel. */
+    private void emitSimRegs() {
+        // Update RIP in simGPR from the current pending instruction
+        if (pendingAsmIdx >= 0 && pendingAsmIdx < asmFlat.size()) {
+            try { simGPR.put("rip", Long.parseUnsignedLong(asmFlat.get(pendingAsmIdx).address, 16)); }
+            catch (Exception ignored) {}
+        }
+
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("RAX", fmtGPR("rax"));
+        m.put("RBX", fmtGPR("rbx"));
+        m.put("RCX", fmtGPR("rcx"));
+        m.put("RDX", fmtGPR("rdx"));
+        m.put("RSI", fmtGPR("rsi"));
+        m.put("RDI", fmtGPR("rdi"));
+        m.put("RSP", fmtGPR("rsp"));
+        m.put("RBP", fmtGPR("rbp"));
+        m.put("RIP", fmtGPR("rip"));
+
+        // Apply per-instruction overrides if the current address has hardcoded values
+        if (pendingAsmIdx >= 0 && pendingAsmIdx < asmFlat.size()) {
+            String curAddr = asmFlat.get(pendingAsmIdx).address;
+            Map<String,String> overrides = instrRegOverrides.get(curAddr);
+            if (overrides != null) m.putAll(overrides); // overrides win over simGPR
+        }
+
+        _simRegs.setValue(m);
+    }
+
+    private String fmtGPR(String reg) {
+        return String.format("0x%x", simGPR.getOrDefault(reg, 0L));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Register evaluator: parses asm text and updates simGPR (display only)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void initSimGPR() {
+        simGPR.clear();
+        // Initialize to zero; estimate initial RSP from top of the visual stack
+        for (String r : new String[]{"rax","rbx","rcx","rdx","rsi","rdi","rsp","rbp","rip"})
+            simGPR.put(r, 0L);
+        if (level != null && level.initialStack != null && !level.initialStack.isEmpty()) {
+            long topAddr = parseAddr(level.initialStack.get(0).address);
+            // Before main()'s 'push rbp', RSP is one slot ABOVE the first block
+            simGPR.put("rsp", topAddr + 8L);
+            simGPR.put("rbp", topAddr + 8L);
+        }
+    }
+
+    /**
+     * Parse one asm instruction line and update simGPR accordingly.
+     * Called for EVERY executed instruction — purely visual, does not affect
+     * step engine, espIndex, or any execution state.
+     */
+    private void updateRegistersForInstr(String raw) {
+        if (raw == null) return;
+        raw = raw.toLowerCase(java.util.Locale.US);
+        String mnem = extractMnem(raw);
+        if (mnem == null) return;
+        String ops = extractOperands(raw);
+
+        switch (mnem) {
+            case "mov": case "movzx": case "movsx": case "movabs": {
+                if (ops == null) break;
+                String[] p = ops.split(",", 2);
+                if (p.length == 2) {
+                    String dst = canonReg(p[0].trim());
+                    if (dst != null) setGPR(dst, resolveOp(p[1].trim()));
+                }
                 break;
             }
-        }
-        if (firstVarIdx == -1) return;
-        setActiveSourceLine(firstVarIdx);
-        _statusTitle.setValue("vuln() Local Variables Allocation");
-
-        List<StackBlock> s = deepCopyStack(getStack());
-        int vulnEbpIdx = initialEsp + 2;
-        if (vulnEbpIdx < s.size()) s.get(vulnEbpIdx).value = "0x7ffe4";
-        _stack.setValue(s);
-        updateHexDump();
-        _ebpIndex.setValue(vulnEbpIdx);
-
-        int buff0Idx = findBlock("buff[0..7]");
-        _espIndex.setValue(buff0Idx >= 0 ? buff0Idx : _espIndex.getValue());
-
-        boolean firstIsNotBuff = !level.code.get(firstVarIdx).text.contains("char buff");
-        _step.setValue(firstIsNotBuff ? 2.5f : 3f);
-        recordSnapshot("vuln() prologue", "vuln");
-    }
-
-    private void step2_5() {
-        int buffIdx = findInCode("char buff", 0);
-        if (buffIdx == -1) buffIdx = (_activeLineIndex.getValue() == null ? 0 : _activeLineIndex.getValue()) + 1;
-        setActiveSourceLine(buffIdx);
-        _statusTitle.setValue("vuln() Array Allocation");
-
-        List<StackBlock> s = deepCopyStack(getStack());
-        if (level.id.equals("2a")) {
-            setBlockValue(s, "secret_key[0..7]", "SUPER_SE");
-            setBlockValue(s, "secret_key[8..15]", "CRET_KEY");
-        }
-        _stack.setValue(s);
-        updateHexDump();
-        _step.setValue(3f);
-        recordSnapshot("alloc buff[]", "vuln");
-    }
-
-    private void step3(boolean patched) {
-        int readIdx = findInCode("read(1, ", 0);
-        int curLine = _activeLineIndex.getValue() == null ? 0 : _activeLineIndex.getValue();
-        int putsInVulnIdx = -1;
-        for (int i = curLine + 1; i < readIdx && i < level.code.size(); i++) {
-            if (level.code.get(i).text.contains("puts")) { putsInVulnIdx = i; break; }
-        }
-
-        if (putsInVulnIdx != -1) {
-            setActiveSourceLine(putsInVulnIdx);
-            String lineText = level.code.get(putsInVulnIdx).text;
-            String printed = extractQuoted(lineText);
-            addConsole(printed, false);
-            _statusTitle.setValue("Executing puts()");
-            _step.setValue(3.5f);
-            recordSnapshot("puts() in vuln", "puts@plt");
-        } else {
-            setActiveSourceLine(readIdx);
-            if (level.id.equals("2a")) {
-                _statusDesc.setValue(patched
-                        ? "read() securely terminates the buffer."
-                        : "read() bounds-check to 16 bytes but no null-terminator.");
+            case "lea": {
+                if (ops == null) break;
+                String[] p = ops.split(",", 2);
+                if (p.length == 2) {
+                    String dst = canonReg(p[0].trim());
+                    if (dst != null) setGPR(dst, resolveMemAddr(p[1].trim()));
+                }
+                break;
             }
-            _statusTitle.setValue("read() Execution");
-            _step.setValue(4f);
-            recordSnapshot("read() ← awaiting input", "read@plt");
+            case "xor": {
+                if (ops == null) break;
+                String[] p = ops.split(",", 2);
+                if (p.length == 2) {
+                    String d = canonReg(p[0].trim()), s = canonReg(p[1].trim());
+                    if (d != null && d.equals(s)) setGPR(d, 0L); // xor reg,reg = 0
+                    else if (d != null) setGPR(d, gpr(d) ^ resolveOp(p[1].trim()));
+                }
+                break;
+            }
+            case "add": {
+                if (ops == null) break;
+                String[] p = ops.split(",", 2);
+                if (p.length == 2) { String d = canonReg(p[0].trim()); if (d != null) setGPR(d, gpr(d) + resolveOp(p[1].trim())); }
+                break;
+            }
+            case "sub": {
+                if (ops == null) break;
+                String[] p = ops.split(",", 2);
+                if (p.length == 2) { String d = canonReg(p[0].trim()); if (d != null) setGPR(d, gpr(d) - resolveOp(p[1].trim())); }
+                break;
+            }
+            case "and": {
+                if (ops == null) break;
+                String[] p = ops.split(",", 2);
+                if (p.length == 2) { String d = canonReg(p[0].trim()); if (d != null) setGPR(d, gpr(d) & resolveOp(p[1].trim())); }
+                break;
+            }
+            case "or": {
+                if (ops == null) break;
+                String[] p = ops.split(",", 2);
+                if (p.length == 2) { String d = canonReg(p[0].trim()); if (d != null) setGPR(d, gpr(d) | resolveOp(p[1].trim())); }
+                break;
+            }
+            case "push":
+                setGPR("rsp", gpr("rsp") - 8);
+                break;
+            case "pop": {
+                setGPR("rsp", gpr("rsp") + 8);
+                // Also update the destination register from the stack if ops given
+                // (exact value comes from simulatePop; here we just advance RSP)
+                break;
+            }
+            case "leave":
+                // leave = mov rsp, rbp ; pop rbp
+                setGPR("rsp", gpr("rbp") + 8); // rsp = rbp (then +8 for pop rbp)
+                // RBP value after leave is unknowable without memory model; leave unchanged
+                break;
+            case "call":
+                setGPR("rsp", gpr("rsp") - 8); // push return address
+                break;
+            case "ret":
+                setGPR("rsp", gpr("rsp") + 8); // pop return address
+                break;
+            default:
+                break;
         }
     }
 
-    private void step3_5(boolean patched) {
-        int readIdx = findInCode("read(1, ", 0);
-        setActiveSourceLine(readIdx);
-        if (level.id.equals("2a")) {
-            _statusDesc.setValue(patched
-                    ? "read() securely terminates the buffer. The secret is completely safe!"
-                    : "read() bounds-check to 16 bytes but no null-terminator. Fill exactly 16 bytes to leak the secret!");
+    /** Map any register name (any width) to its canonical 64-bit name. */
+    private static String canonReg(String name) {
+        switch (name.replaceAll("\\s.*","")) { // strip trailing junk like "ptr"
+            case "rax": case "eax": case "ax": case "al": case "ah": return "rax";
+            case "rbx": case "ebx": case "bx": case "bl": case "bh": return "rbx";
+            case "rcx": case "ecx": case "cx": case "cl": case "ch": return "rcx";
+            case "rdx": case "edx": case "dx": case "dl": case "dh": return "rdx";
+            case "rsi": case "esi": case "si": case "sil":            return "rsi";
+            case "rdi": case "edi": case "di": case "dil":            return "rdi";
+            case "rsp": case "esp": case "sp": case "spl":            return "rsp";
+            case "rbp": case "ebp": case "bp": case "bpl":            return "rbp";
+            case "rip": case "eip":                                    return "rip";
+            default: return null; // r8-r15, xmm, etc.
         }
-        _statusTitle.setValue("read() Execution");
-        _step.setValue(4f);
-        recordSnapshot("read() ← awaiting input", "read@plt");
     }
 
+    /** Resolve an operand string to a long value using simGPR for register sources. */
+    private long resolveOp(String op) {
+        op = op.trim().replaceFirst("\\s*#.*$", "").trim(); // strip asm comments
+        String reg = canonReg(op);
+        if (reg != null) return gpr(reg);
+        // Hex immediate: 0x...
+        if (op.startsWith("0x")) {
+            try { return Long.parseUnsignedLong(op.substring(2), 16); } catch (Exception e) {}
+        }
+        // Negative hex: -0x...
+        if (op.startsWith("-0x")) {
+            try { return -Long.parseUnsignedLong(op.substring(3), 16); } catch (Exception e) {}
+        }
+        // Decimal
+        try { return Long.parseLong(op); } catch (Exception e) {}
+        // Memory reference: try resolveMemAddr
+        if (op.startsWith("[")) return resolveMemAddr(op);
+        return 0L;
+    }
+
+    /** Resolve a memory-reference operand like [rbp-0x10] or [rip+0x2c35] to an address. */
+    private long resolveMemAddr(String op) {
+        op = op.trim().replaceFirst("\\s*#.*$", "").trim();
+        if (op.startsWith("[") && op.endsWith("]"))
+            op = op.substring(1, op.length() - 1).trim();
+        // Find last +/- (index 0 means sign before the first token, skip that)
+        int plus = op.lastIndexOf('+'), minus = op.lastIndexOf('-');
+        int split = Math.max(plus, minus > 0 ? minus : -1); // ignore leading '-'
+        if (split > 0) {
+            String baseS = op.substring(0, split).trim();
+            String offS  = op.substring(split).trim(); // "+-0x..."
+            String baseReg = canonReg(baseS);
+            long base = baseReg != null ? gpr(baseReg) : 0L;
+            long off  = 0;
+            try {
+                offS = offS.replace("+","").trim();
+                if (offS.startsWith("-0x")) off = -Long.parseUnsignedLong(offS.substring(3), 16);
+                else if (offS.startsWith("0x")) off = Long.parseUnsignedLong(offS.substring(2), 16);
+                else off = Long.parseLong(offS);
+            } catch (Exception ignored) {}
+            return base + off;
+        }
+        String reg = canonReg(op);
+        return reg != null ? gpr(reg) : 0L;
+    }
+
+    /** Extract the operands string from an objdump asm line (everything after the mnemonic). */
+    private String extractOperands(String rawLower) {
+        int colon = rawLower.indexOf(':');
+        if (colon < 0) return null;
+        String rest = rawLower.substring(colon + 1).trim();
+        String[] parts = rest.split("\\s{2,}");
+        if (parts.length < 2) return null;
+        String instrPart = parts[1].trim();
+        int sp = instrPart.indexOf(' ');
+        if (sp < 0) return null;
+        String ops = instrPart.substring(sp + 1).trim();
+        // Strip inline asm comments (# ...) and ← annotations
+        ops = ops.replaceFirst("\\s*[#←].*$", "").trim();
+        return ops.isEmpty() ? null : ops;
+    }
+
+    private long gpr(String reg) { return simGPR.getOrDefault(reg, 0L); }
+    private void setGPR(String reg, long val) { simGPR.put(reg, val); }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Input / Payload submission — clears waitingForInput and resumes execution
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Level 1 / 2A: user typed a string into the read() prompt. */
     public void submitInput(String input) {
+        _getsReached.setValue(false);
         _userInput.setValue(input);
         boolean patched = isPatched();
 
-        String processedInput = input;
+        String processed = input;
         if (patched) {
-            int maxLen = level.id.equals("2a") ? 15 : 16;
-            if (processedInput.length() > maxLen) processedInput = processedInput.substring(0, maxLen);
+            int max = "2a".equals(level.id) ? 15 : 16;
+            if (processed.length() > max) processed = processed.substring(0, max);
         }
 
         List<StackBlock> newStack = deepCopyStack(getStack());
-        int bufferStartIdx = findBlockIndex(newStack, "buff[0");
-        int currentIdx = bufferStartIdx;
+        int bufferStartIdx   = findBlockIndex(newStack, "buff[0");
+        int currentIdx       = bufferStartIdx;
         boolean hasOverflowed = false;
+        String remaining      = processed;
 
-        String remaining = processedInput;
         while (!remaining.isEmpty() && currentIdx >= 0) {
             String chunk = remaining.substring(0, Math.min(8, remaining.length()));
             remaining = remaining.substring(chunk.length());
@@ -390,250 +955,51 @@ public class LevelViewModel extends ViewModel {
                 hasOverflowed = true;
                 block.type = StackBlock.TYPE_DANGER;
                 if (!block.label.contains("CORRUPT")) block.label += " (CORRUPTED)";
-            } else {
-                block.type = StackBlock.TYPE_FILLED;
-            }
+            } else { block.type = StackBlock.TYPE_FILLED; }
             block.value = chunk;
             currentIdx--;
-            if ((patched || level.id.equals("2a")) && currentIdx < bufferStartIdx - 1) break;
+            if ((patched || "2a".equals(level.id)) && currentIdx < bufferStartIdx - 1) break;
         }
 
-        _stack.setValue(newStack);
-        updateHexDump();
+        _stack.setValue(newStack); updateHexDump();
         _statusTitle.setValue(hasOverflowed ? "BUFFER OVERFLOW!" : "Input Received Safely");
         _statusType.setValue(hasOverflowed ? "danger" : "success");
+        _statusDesc.setValue(hasOverflowed
+                ? "Input overflowed the buffer into adjacent stack regions!"
+                : "Input fit safely inside the buffer. No overflow.");
         _step.setValue(5f);
-        recordSnapshot(hasOverflowed ? "OVERFLOW!" : "Input safe", "read@plt");
+
+        // Resume execution past the call gets/read instruction
+        resumeAfterGets();
     }
 
-    private void step5(String input, boolean patched) {
-        int printfIdx = findInCode("printf", 0);
-        if (printfIdx != -1) {
-            setActiveSourceLine(printfIdx);
-            _statusTitle.setValue("Executing printf()");
-            int maxLen = level.id.equals("2a") ? (patched ? 15 : 16) : 100;
-            String out = input.substring(0, Math.min(maxLen, input.length()));
-            addConsole(out, false);
-            boolean shouldLeak = !patched && input.length() >= 16;
-            if (level.id.equals("2a") && shouldLeak) addConsole("SUPER_SECRET_KEY", true);
-        } else {
-            int rIdx = findInCode("read(1, ", 0);
-            int endIdx = findClosingBraceAfter(rIdx);
-            setActiveSourceLine(endIdx);
-            _statusTitle.setValue("vuln() Epilogue");
-        }
-        _step.setValue(6f);
-        recordSnapshot("printf() output", "printf@plt");
-    }
-
-    private void step6(String input, boolean patched) {
-        _statusTitle.setValue("vuln() Epilogue");
-
-        boolean returnedSafely = true;
-        List<StackBlock> currentStack = getStack();
-        StackBlock retBlock = null;
-        for (StackBlock b : currentStack) {
-            if (b.label.contains("Return Addr") && !b.label.contains("main")) {
-                retBlock = b;
-                break;
-            }
-        }
-        if (!patched && input.length() > 16 && retBlock != null && retBlock.type.equals(StackBlock.TYPE_DANGER)) {
-            returnedSafely = false;
-        }
-
-        if (!returnedSafely) {
-            _statusType.setValue("danger");
-            _statusTitle.setValue("Segmentation Fault!");
-            _statusDesc.setValue("Execution crashed.");
-            _step.setValue(100f);
-            recordSnapshot("SIGSEGV", "0x????????");
-            if (level.goal.equals("CRASH")) triggerWin(false);
-        } else {
-            if (patched && input.length() > 16 && level.goal.equals("CRASH")) {
-                _statusDesc.setValue("Defended!");
-                _statusType.setValue("success");
-                triggerWin(true);
-            }
-            _espIndex.setValue(Math.max(0, initialEsp - 1));
-            _ebpIndex.setValue(initialEsp);
-            _step.setValue(7f);
-            recordSnapshot("ret from vuln()", "main");
-        }
-    }
-
-    private void step7() {
-        int putsAfterVuln = -1;
-        int vulnCallIdx = findInCode("vuln();", level.startCodeLine);
-        for (int i = vulnCallIdx + 1; i < level.code.size(); i++) {
-            if (level.code.get(i).text.contains("puts(")) { putsAfterVuln = i; break; }
-        }
-
-        if (putsAfterVuln != -1) {
-            setActiveSourceLine(putsAfterVuln);
-            _statusTitle.setValue("Returned Safely to main()");
-            addConsole("Goodbye!!!", false);
-            _step.setValue(8f);
-            recordSnapshot("puts() in main", "puts@plt");
-        } else {
-            int endMain = findClosingBraceAfter(level.startCodeLine);
-            setActiveSourceLine(endMain);
-            _statusTitle.setValue("Program Exited");
-            _step.setValue(100f);
-            recordSnapshot("main() exited", "exit");
-            checkLeakWin();
-        }
-    }
-
-    private void step8(String input, boolean patched) {
-        int endMain = findClosingBraceAfter(level.startCodeLine);
-        setActiveSourceLine(endMain);
-        _statusTitle.setValue("Program Exited");
-        _step.setValue(100f);
-        recordSnapshot("main() exited", "exit");
-        if (level.goal.equals("LEAK")) checkLeakWin();
-    }
-
-    private void checkLeakWin() {
-        String input = _userInput.getValue() == null ? "" : _userInput.getValue();
-        boolean patched = isPatched();
-        if (!patched && input.length() >= 16) {
-            triggerWin(false);
-        } else if (patched && input.length() >= 16) {
-            _statusDesc.setValue("Defended! The null-terminator safely blocked the secret from leaking!");
-            _statusType.setValue("success");
-            triggerWin(true);
-        } else if (!patched) {
-            _statusDesc.setValue("Program finished safely, but we didn't leak the secret. Try submitting exactly 16 bytes.");
-            _statusType.setValue("warn");
-        }
-    }
-
-    private void triggerWin(boolean defended) {
-        if (defended) {
-            _toast.setValue(new Pair<>("🛡️ Defended! The patch successfully blocked the exploit.", true));
-        } else {
-            _toast.setValue(new Pair<>("💥 Exploit succeeded! Swap the read syscall to defend.", false));
-        }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // ── Level 2B Step Engine ──────────────────────────────────────────────────
-    // ══════════════════════════════════════════════════════════════════════════
-
-    private void handle2bNextStep(float currentStep) {
-        int s = (int)(currentStep * 10);
-        switch (s) {
-            case 0:  step2b_0(); break;   // Show main()
-            case 10: step2b_1(); break;   // call vuln — push ret addr
-            case 20: step2b_2(); break;   // vuln prologue + sub rsp,0x20
-            case 30: step2b_3(); break;   // gets() — fire getsReached
-            // 40 = waiting for gets result (submitPayload or submitNormalInput2b)
-            case 50: step2b_5(); break;   // after payload applied — show overflow
-            case 60: step2b_6(); break;   // ret / win() branch
-            case 70: step2b_7(); break;   // win prints flag / program exits
-        }
-    }
-
-    /** Step 0: Program ready — main() is already shown on load, jump straight to step 1. */
-    private void step2b_0() {
-        // main() is already highlighted by reset() via level.startCodeLine.
-        // Calling step2b_1() directly means the FIRST Next Step press shows
-        // "call vuln" instead of redundantly re-highlighting main().
-        step2b_1();
-    }
-
-    /** Step 1: call vuln — push return address */
-    private void step2b_1() {
-        int callIdx = findInCode("vuln();", 0);
-        setActiveSourceLine(callIdx >= 0 ? callIdx : level.startCodeLine);
-        _statusTitle.setValue("call vuln()");
-        _statusDesc.setValue("CPU pushes the return address (0x4004ac) onto the stack, then jumps to vuln().");
-
-        List<StackBlock> s = deepCopyStack(getStack());
-        // Block index 2 = "vuln Return Addr" — mark as filled
-        if (s.size() > 2) {
-            s.get(2).value = "0x4004ac";
-            s.get(2).type  = StackBlock.TYPE_SAFE;
-        }
-        _stack.setValue(s);
-        updateHexDump();
-        _espIndex.setValue(2); // RSP now points at vuln ret addr
-        _step.setValue(2f);
-        recordSnapshot("call vuln()", "vuln");
-    }
-
-    /** Step 2: vuln() prologue — push rbp, sub rsp,0x20 */
-    private void step2b_2() {
-        int vulnIdx = findInCode("void vuln() {", 0);
-        setActiveSourceLine(vulnIdx >= 0 ? vulnIdx : level.startCodeLine);
-        _statusTitle.setValue("vuln() Prologue");
-        _statusDesc.setValue("push rbp saves caller's frame. sub rsp,0x20 reserves 32 bytes for buf.");
-
-        List<StackBlock> s = deepCopyStack(getStack());
-        if (s.size() > 3) {
-            s.get(3).value = "0x7fff8";
-            s.get(3).type  = StackBlock.TYPE_SAFE;
-        }
-        _stack.setValue(s);
-        updateHexDump();
-        _ebpIndex.setValue(3); // RBP = saved main's RBP
-        _espIndex.setValue(7); // RSP = bottom of buf
-        _step.setValue(3f);
-        recordSnapshot("vuln() prologue", "vuln");
-    }
-
-    /** Step 3: gets(buf) called — notify LevelFragment */
-    private void step2b_3() {
-        int getsIdx = findInCode("gets(buf);", 0);
-        setActiveSourceLine(getsIdx >= 0 ? getsIdx : level.startCodeLine);
-        _statusTitle.setValue("gets() called");
-        _statusDesc.setValue("gets() reads from stdin with NO bounds check. Choose how to respond.");
-        _step.setValue(4f); // pause — wait for dialog result
-        recordSnapshot("gets() awaiting input", "gets@plt");
-        _getsReached.setValue(true); // signal LevelFragment
-    }
-
-    /** Called by LevelFragment when payload builder completes. */
+    /** Level 2B: payload builder submitted a crafted overflow targeting win(). */
     public void submitPayload(int junkStart, int junkEnd, int targetIdx, String address) {
         _getsReached.setValue(false);
-
         List<StackBlock> s = deepCopyStack(getStack());
-
-        // Mark junk blocks
         for (int i = junkStart; i <= junkEnd; i++) {
-            if (i < s.size()) {
-                s.get(i).type  = StackBlock.TYPE_JUNK;
-                s.get(i).value = "AAAAAAAA";
-            }
+            if (i < s.size()) { s.get(i).type = StackBlock.TYPE_JUNK; s.get(i).value = "AAAAAAAA"; }
         }
-
-        // Mark target block
         if (targetIdx >= 0 && targetIdx < s.size()) {
             s.get(targetIdx).type  = StackBlock.TYPE_TARGET;
             s.get(targetIdx).value = address;
         }
-
-        _stack.setValue(s);
-        updateHexDump();
-
+        _stack.setValue(s); updateHexDump();
         _statusTitle.setValue("BUFFER OVERFLOW!");
         _statusType.setValue("danger");
-        _statusDesc.setValue("buf overflowed into saved RBP and return address! RIP will jump to " + address + " on ret.");
+        _statusDesc.setValue("buf overflowed into saved RBP and return address! RIP → " + address + " on ret.");
         _step.setValue(5f);
-        recordSnapshot("OVERFLOW — ret addr overwritten", "gets@plt");
+        resumeAfterGets();
     }
 
-    /** Called when player chooses 'Enter Normal Value'. */
+    /** Level 2B: user chose 'Enter Normal Value' from the gets dialog. */
     public void submitNormalInput2b(String input) {
         _getsReached.setValue(false);
         _userInput.setValue(input);
-
-        List<StackBlock> s = deepCopyStack(getStack());
-        int currentIdx = 7; // buf[0..7]
-        String remaining = input;
-        boolean overflowed = false;
-
+        List<StackBlock> s    = deepCopyStack(getStack());
+        int currentIdx        = 7;
+        String remaining      = input;
+        boolean overflowed    = false;
         while (!remaining.isEmpty() && currentIdx >= 0) {
             String chunk = remaining.substring(0, Math.min(8, remaining.length()));
             remaining = remaining.substring(chunk.length());
@@ -642,148 +1008,171 @@ public class LevelViewModel extends ViewModel {
                 overflowed = true;
                 block.type = StackBlock.TYPE_DANGER;
                 if (!block.label.contains("CORRUPT")) block.label += " (CORRUPTED)";
-            } else {
-                block.type = StackBlock.TYPE_FILLED;
-            }
+            } else { block.type = StackBlock.TYPE_FILLED; }
             block.value = chunk;
             currentIdx--;
         }
-
-        _stack.setValue(s);
-        updateHexDump();
-
-        if (overflowed) {
-            _statusTitle.setValue("BUFFER OVERFLOW!");
-            _statusType.setValue("danger");
-            _statusDesc.setValue("Input overflowed buf[] into adjacent stack regions!");
-        } else {
-            _statusTitle.setValue("Input Received");
-            _statusType.setValue("success");
-            _statusDesc.setValue("Input fit safely inside buf[]. No overflow.");
-        }
+        _stack.setValue(s); updateHexDump();
+        _statusTitle.setValue(overflowed ? "BUFFER OVERFLOW!" : "Input Received");
+        _statusType.setValue(overflowed ? "danger" : "success");
+        _statusDesc.setValue(overflowed
+                ? "Input overflowed buf[] into adjacent stack regions!"
+                : "Input fit safely inside buf[]. No overflow.");
         _step.setValue(5f);
-        recordSnapshot(overflowed ? "OVERFLOW" : "safe input", "gets@plt");
+        resumeAfterGets();
     }
 
-    /** Step 5: show result of gets — highlight leave/ret */
-    private void step2b_5() {
-        int retIdx = findInCode("}", findInCode("gets(buf);", 0));
-        setActiveSourceLine(retIdx >= 0 ? retIdx : level.startCodeLine);
-        _statusTitle.setValue("vuln() Epilogue — ret");
+    /** Level 3: NX demo — shellcode attempt that will SIGSEGV. */
+    public void submitNxDemoPayload() {
+        _getsReached.setValue(false);
+        _statusTitle.setValue("Shellcode on Stack — Returning...");
+        _statusType.setValue("danger");
+        _statusDesc.setValue("NX Demo: saved return address overwritten with 0x7ffd8000 (stack addr). "
+                + "vuln() will try to execute stack code — NX prevents it.");
+        List<StackBlock> stk = deepCopyStack(getStack());
+        markJunk(stk, 3, 7);
+        if (stk.size() > 2) { stk.get(2).value = "0x7ffd8000"; stk.get(2).type = StackBlock.TYPE_DANGER; }
+        _stack.setValue(stk); updateHexDump();
+        _step.setValue(5f);
+        resumeAfterGets();
+    }
 
-        // Check if ret addr was overwritten
-        List<StackBlock> s = getStack();
-        boolean hijacked = false;
-        String ripTarget = "0x4004ac";
-        if (s != null && s.size() > 2) {
-            StackBlock retBlock = s.get(2);
-            if (retBlock.type.equals(StackBlock.TYPE_TARGET) ||
-                retBlock.type.equals(StackBlock.TYPE_DANGER)) {
-                hijacked = true;
-                ripTarget = retBlock.value;
+    /** Level 3: ROP editor submitted a chain. */
+    public void submitRopPayload(List<String> payloadAddresses) {
+        _getsReached.setValue(false);
+        if (payloadAddresses == null || payloadAddresses.isEmpty()) return;
+
+        List<StackBlock> stk = deepCopyStack(getStack());
+        markJunk(stk, 3, 7);
+
+        int insertIdx = 2;
+        for (String addr : payloadAddresses) {
+            if (insertIdx >= 0) {
+                stk.get(insertIdx).value = addr;
+                stk.get(insertIdx).type  = StackBlock.TYPE_TARGET;
+                insertIdx--;
+            } else {
+                long topAddr = parseAddr(stk.get(0).address) + 8L;
+                StackBlock nb = new StackBlock(
+                        "0x" + Long.toHexString(topAddr), "ROP", addr, 8, StackBlock.TYPE_TARGET);
+                stk.add(0, nb);
+                Integer ce = _espIndex.getValue(), cb = _ebpIndex.getValue();
+                if (ce != null) _espIndex.setValue(ce + 1);
+                if (cb != null) _ebpIndex.setValue(cb + 1);
+                // DO NOT increment insertIdx — it stays negative to mark all
+                // subsequent addresses as prepend-needed
             }
         }
+        _stack.setValue(stk); updateHexDump();
 
-        if (hijacked) {
-            _statusDesc.setValue("leave; ret — RIP loads " + ripTarget + " from the (corrupted) stack top!");
-            _statusType.setValue("danger");
-        } else {
-            _statusDesc.setValue("leave; ret — RIP safely loads 0x4004ac (return to main).");
-            _statusType.setValue("info");
-        }
-        _step.setValue(6f);
-        recordSnapshot("ret from vuln()", ripTarget);
+        ropPayload    = new ArrayList<>(payloadAddresses);
+        ropPayloadPos = 0;
+        ropEspIdx     = insertIdx + 1;
+
+        _statusTitle.setValue("ROP Payload Injected!");
+        _statusType.setValue("danger");
+        _statusDesc.setValue("Return address overwritten with " + ropPayload.get(0)
+                + ". Press n/ni to execute leave;ret and start hopping gadgets.");
+        _step.setValue(5f);
+        resumeAfterGets();
     }
 
-    /** Step 6: branch — win() or safe return */
-    private void step2b_6() {
-        List<StackBlock> s = getStack();
-        boolean hijacked = s != null && s.size() > 2 &&
-                (s.get(2).type.equals(StackBlock.TYPE_TARGET) ||
-                 s.get(2).type.equals(StackBlock.TYPE_DANGER));
-        String addr = s != null && s.size() > 2 ? s.get(2).value : "";
-        boolean landedOnWin = "0x400476".equalsIgnoreCase(addr);
+    public void consumeGetsReached() { _getsReached.setValue(false); }
 
-        if (hijacked && landedOnWin) {
-            int winIdx = findInCode("puts(\"SHELL OBTAINED", 0);
-            setActiveSourceLine(winIdx >= 0 ? winIdx : 0);
-            _statusTitle.setValue("RIP hijacked → win()!");
-            _statusType.setValue("success");
-            _statusDesc.setValue("Execution jumped to 0x400476. win() is now running.");
-            addConsole("SHELL OBTAINED — flag{ctrl_flow_h1jack}", false);
-            _toast.setValue(new Pair<>("💥 Shell obtained! flag{ctrl_flow_h1jack}", false));
-            _step.setValue(70f); // terminal
-            recordSnapshot("win() executed!", "0x400476");
-        } else if (hijacked) {
-            // Wrong address — show crash
-            _statusTitle.setValue("Segmentation Fault!");
-            _statusType.setValue("danger");
-            _statusDesc.setValue("RIP jumped to " + addr + " — not a valid function. Hint: try 0x400476.");
-            addConsole("[1]    killed  Segmentation fault", false);
-            _step.setValue(70f);
-            recordSnapshot("SIGSEGV", addr);
-        } else {
-            // Safe return
-            int mainEndIdx = findInCode("return 0;", 0);
-            if (mainEndIdx < 0) mainEndIdx = findClosingBraceAfter(findInCode("int main() {", 0));
-            setActiveSourceLine(mainEndIdx);
-            _statusTitle.setValue("Returned Safely to main()");
-            _statusType.setValue("success");
-            _statusDesc.setValue("No overflow — program returned normally.");
-            _step.setValue(70f);
-            recordSnapshot("main() exited", "exit");
-        }
+    /** Clears the waiting state and advances pendingAsmIdx past the call gets/read. */
+    private void resumeAfterGets() {
+        execWaiting = false;
+        _waitingForInput.setValue(false);
+        int nextIdx = skipToNextRealInstr(pendingAsmIdx + 1);
+        pendingAsmIdx = nextIdx;
+        _activeAsmInstrIdx.setValue(pendingAsmIdx);
+        syncSourceToAsm();
+        emitSimRegs();
     }
 
-    /** Terminal step for 2B */
-    private void step2b_7() {
-        // Already at terminal
+    // ─────────────────────────────────────────────────────────────────────────
+    // Win condition helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void triggerWin(boolean defended) {
+        _toast.setValue(defended
+                ? new Pair<>("🛡️ Defended! The patch successfully blocked the exploit.", true)
+                : new Pair<>("💥 Exploit succeeded! Swap the read syscall to defend.", false));
+    }
+
+    /** execve syscall win check — reused from Level 3 ROP engine. */
+    private void execSyscall(String ripAddr, List<StackBlock> stk) {
+        boolean win = false;
+        try {
+            long raxV     = parseAddr(rop_rax);
+            long rdiV     = parseAddr(rop_rdi);
+            long rsiV     = parseAddr(rop_rsi);
+            long rdxV     = parseAddr(rop_rdx);
+            long binshAddr = resolveBinshAddr();
+            win = (raxV == 59 && rdiV == binshAddr && rsiV == 0 && rdxV == 0);
+        } catch (Exception ignored) {}
+
+        if (win) {
+            _statusTitle.setValue("execve(\"/bin/sh\", 0, 0) — Shell!");
+            _statusType.setValue("success");
+            _statusDesc.setValue(
+                    "syscall #59 executed — all args correct:\n"
+                    + "  RAX = 59  (execve)\n"
+                    + "  RDI = " + rop_rdi + "  (→ /bin/sh)\n"
+                    + "  RSI = 0   (argv = NULL)\n"
+                    + "  RDX = 0   (envp = NULL)\n"
+                    + "NX bypassed — only existing binary code used.");
+            addConsole("", false);
+            addConsole("$ id", true);
+            addConsole("uid=0(root) gid=0(root) groups=0(root)", false);
+            addConsole("$ echo $0", true);
+            addConsole("/bin/sh", false);
+            addConsole("$ SHELL OBTAINED — flag{r0p_ch4in_nx_byp4ss}", false);
+            _toast.setValue(new Pair<>("💥 Shell obtained via ROP!", true));
+        } else {
+            _statusTitle.setValue("syscall — Wrong Arguments");
+            _statusType.setValue("danger");
+            _statusDesc.setValue("syscall fired but args were wrong:\n"
+                    + "  RAX = " + rop_rax + "  (need 59)\n"
+                    + "  RDI = " + rop_rdi + "  (need " + String.format("0x%x", resolveBinshAddr()) + ")\n"
+                    + "  RSI = " + rop_rsi + "  (need 0)\n"
+                    + "  RDX = " + rop_rdx + "  (need 0)");
+            addConsole("[1]  Killed  (bad syscall args)", false);
+        }
         _step.setValue(100f);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private void addConsole(String text, boolean isGarbage) {
-        List<Pair<String, Boolean>> list = new ArrayList<>(_consoleOut.getValue() == null
-                ? new ArrayList<>() : _consoleOut.getValue());
-        list.add(new Pair<>(text, isGarbage));
-        _consoleOut.setValue(list);
+    private long resolveBinshAddr() {
+        if (level != null) {
+            for (com.example.secviz.data.RopGadget g : level.ropGadgets) {
+                if ("/bin/sh".equals(g.alias)) {
+                    try { return Long.parseUnsignedLong(g.address.replace("0x","").replace("0X",""), 16); }
+                    catch (Exception ignored) {}
+                }
+            }
+        }
+        return 0x403010L;
     }
 
-    // ── Assembly / ni helpers ─────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // asm map builder
+    // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Parses level.objdump into asmFlat and populates all address lookup maps.
-     * Also walks level.code CodeLine.asm varargs to map source lines ↔ addresses.
-     * Called once after level load.
-     */
     private void buildAsmMaps() {
-        asmFlat.clear();
-        addrToAsmIdx.clear();
-        srcLineToFirstAddr.clear();
-        addrToSrcLine.clear();
-        activeAsmIdx = -1;
-
+        asmFlat.clear(); addrToAsmIdx.clear();
+        srcLineToFirstAddr.clear(); addrToSrcLine.clear();
         if (level == null || level.objdump == null) return;
 
-        // ── parse objdump into flat AsmLine list ──────────────────────────────
-        java.util.regex.Pattern instrPat = java.util.regex.Pattern
-                .compile("^\\s+([0-9a-fA-F]+):\\s+.*");
-        java.util.regex.Pattern hdrPat = java.util.regex.Pattern
-                .compile("[0-9a-fA-F]{8,16}\\s+<[^>]+>:.*");
-        java.util.regex.Pattern callPat = java.util.regex.Pattern
-                .compile("\\bcall\\s+([0-9a-fA-F]+)");
+        java.util.regex.Pattern instrPat = java.util.regex.Pattern.compile("^\\s+([0-9a-fA-F]+):\\s+.*");
+        java.util.regex.Pattern hdrPat   = java.util.regex.Pattern.compile("[0-9a-fA-F]{8,16}\\s+<[^>]+>:.*");
+        java.util.regex.Pattern callPat  = java.util.regex.Pattern.compile("\\bcall\\s+([0-9a-fA-F]+)");
 
-        String[] rawLines = level.objdump.split("\\n");
-        for (String raw : rawLines) {
-            int idx = asmFlat.size();
-            String trimmed = raw.trim();
-
-            if (hdrPat.matcher(trimmed).matches()) {
-                asmFlat.add(new AsmLine(idx, "", raw, true, null));
-                continue;
+        for (String raw : level.objdump.split("\\n")) {
+            int idx     = asmFlat.size();
+            String trim = raw.trim();
+            if (hdrPat.matcher(trim).matches()) {
+                asmFlat.add(new AsmLine(idx, "", raw, true, null)); continue;
             }
-
             java.util.regex.Matcher m = instrPat.matcher(raw);
             if (m.matches()) {
                 String addr = m.group(1).toLowerCase(java.util.Locale.US);
@@ -791,18 +1180,13 @@ public class LevelViewModel extends ViewModel {
                 java.util.regex.Matcher cm = callPat.matcher(raw);
                 if (cm.find()) callTarget = cm.group(1).toLowerCase(java.util.Locale.US);
                 asmFlat.add(new AsmLine(idx, addr, raw, false, callTarget));
-                addrToAsmIdx.put(addr, idx);
-                continue;
+                addrToAsmIdx.put(addr, idx); continue;
             }
-
-            // Blank / separator
             asmFlat.add(new AsmLine(idx, "", raw, false, null));
         }
 
-        // ── map source lines ↔ asm addresses via CodeLine.asm varargs ─────────
         if (level.code != null) {
-            java.util.regex.Pattern addrPat = java.util.regex.Pattern
-                    .compile("^\\s+([0-9a-fA-F]+):");
+            java.util.regex.Pattern addrPat = java.util.regex.Pattern.compile("^\\s+([0-9a-fA-F]+):");
             for (int srcIdx = 0; srcIdx < level.code.size(); srcIdx++) {
                 CodeLine cl = level.code.get(srcIdx);
                 if (cl.asm == null || cl.asm.isEmpty()) continue;
@@ -811,225 +1195,58 @@ public class LevelViewModel extends ViewModel {
                     if (m2.find()) {
                         String addr = m2.group(1).toLowerCase(java.util.Locale.US);
                         addrToSrcLine.put(addr, srcIdx);
-                        if (!srcLineToFirstAddr.containsKey(srcIdx)) {
-                            srcLineToFirstAddr.put(srcIdx, addr);
-                        }
+                        if (!srcLineToFirstAddr.containsKey(srcIdx)) srcLineToFirstAddr.put(srcIdx, addr);
                     }
                 }
             }
         }
-
-        // Prime cursor to start line
-        syncAsmToSourceLine(level.startCodeLine);
     }
 
-    /**
-     * Move the assembly cursor to the first instruction of the given C source line.
-     * No-op if that source line has no associated asm address.
-     */
-    private void syncAsmToSourceLine(int srcIdx) {
-        String addr = srcLineToFirstAddr.get(srcIdx);
-        if (addr == null) return;
-        Integer flatIdx = addrToAsmIdx.get(addr);
-        if (flatIdx == null) return;
-        activeAsmIdx = flatIdx;
-        _activeAsmInstrIdx.setValue(flatIdx);
+    // ─────────────────────────────────────────────────────────────────────────
+    // Utility: stack, code, hex, console, snapshot
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public void togglePatchAndReset() {
+        togglePatch();
+        // Don't reset — patch is visual only; user can Reset manually
     }
 
-    /**
-     * GDB "ni" — advance one machine instruction.
-     *
-     * Rules:
-     *   • CALL instruction → jump to call target address (enter function)
-     *   • Otherwise      → sequential next in the flat list
-     *   • Skip header/blank lines
-     *   • Sync _activeLineIndex to the C source line that owns the new instruction
-     */
-    public void handleNextInstruction() {
-        if (asmFlat.isEmpty() || activeAsmIdx < 0) return;
-
-        AsmLine cur = asmFlat.get(activeAsmIdx);
-        int nextIdx;
-
-        if (cur.callTarget != null) {
-            Integer targetFlatIdx = addrToAsmIdx.get(cur.callTarget);
-            nextIdx = (targetFlatIdx != null) ? targetFlatIdx : activeAsmIdx + 1;
-        } else {
-            nextIdx = activeAsmIdx + 1;
-        }
-
-        // Skip non-instruction lines
-        while (nextIdx < asmFlat.size()) {
-            AsmLine c = asmFlat.get(nextIdx);
-            if (!c.isHeader && !c.address.isEmpty()) break;
-            nextIdx++;
-        }
-        if (nextIdx >= asmFlat.size()) return;
-
-        activeAsmIdx = nextIdx;
-        _activeAsmInstrIdx.setValue(nextIdx);
-
-        String newAddr = asmFlat.get(nextIdx).address;
-        Integer srcLine = addrToSrcLine.get(newAddr);
-        if (srcLine != null) {
-            _activeLineIndex.setValue(srcLine); // raw — don't re-sync asm cursor
-
-            // ── Step-engine bridge (source line known) ────────────────────────
-            checkNiStepTrigger(srcLine);
-        } else {
-            // ── Step-engine bridge (inside gadget / PLT / runtime code) ───────
-            // No source-line mapping: we're inside a ROP gadget or PLT stub.
-            // Advance the step engine so the simulation (gadget hops, win check)
-            // stays in sync even though the C source panel can't update.
-            checkNiStepTriggerNoSrcLine();
-        }
-    }
-
-
-    /**
-     * When ni advances to a source line that would normally be triggered by the
-     * step engine (e.g. gets() dialog, syscall), fire that handler now.
-     * Only fires if the step engine hasn't already passed that point.
-     */
-    private void checkNiStepTrigger(int srcLine) {
-        if (level == null || srcLine < 0 || srcLine >= level.code.size()) return;
-        String lineText = level.code.get(srcLine).text.trim();
-        int currentStepInt = (int)((_step.getValue() == null ? 0f : _step.getValue()) * 10);
-
-        // ── Post-payload steps (overflow / ROP / win) ─────────────────────────
-        // These trigger when ni reaches code lines AFTER the payload was submitted.
-        // Covers: return address overwrite (2B) and ROP return (3).
-        if (currentStepInt == 50) {
-            switch (level.id) {
-                case "2b": step2b_5(); return;   // show overflow result
-                case "3":  step3_ret(); return;  // leave ; ret fires
-            }
-        }
-        if (currentStepInt == 60) {
-            switch (level.id) {
-                case "2b": step2b_6(); return;   // ret / jump to win()
-                case "3":  step3_hop(); return;  // execute next ROP gadget
-            }
-        }
-        if (currentStepInt == 70 && "2b".equals(level.id)) {
-            step2b_7(); return;  // win() prints flag
-        }
-
-        // ── gets() line → trigger the gets dialog (step 30) ──────────────────
-        if ((lineText.startsWith("gets(") || lineText.contains(" gets("))
-                && currentStepInt < 30) {
-            switch (level.id) {
-                case "2b": step2b_3(); break;
-                case "3":  step3_gets(); break;
-            }
-            return;
-        }
-
-        // ── vuln() call line → push return address (step 10) ─────────────────
-        if (lineText.startsWith("vuln()") && currentStepInt < 10) {
-            switch (level.id) {
-                case "2b": step2b_1(); break;
-                case "3":  step3_callVuln(); break;
-            }
-            return;
-        }
-
-        // ── void vuln() prologue → stack frame setup (step 20) ───────────────
-        if (lineText.startsWith("void vuln()") && currentStepInt < 20) {
-            switch (level.id) {
-                case "2b": step2b_2(); break;
-                case "3":  step3_prologue(); break;
-            }
-        }
-    }
-
-    /**
-     * Called from handleNextInstruction() when the new asm address has NO
-     * source-line mapping — i.e. we are inside a gadget / PLT stub / runtime
-     * code. In that case we still need to advance the step engine so that the
-     * simulation stays in sync (ROP hops, win condition check, etc.).
-     */
-    private void checkNiStepTriggerNoSrcLine() {
-        if (level == null) return;
-        int currentStepInt = (int)((_step.getValue() == null ? 0f : _step.getValue()) * 10);
-
-        // ROP / post-payload phase
-        if (currentStepInt == 50) {
-            switch (level.id) {
-                case "2b": step2b_5(); return;
-                case "3":  step3_ret(); return;
-            }
-        }
-        if (currentStepInt == 60) {
-            switch (level.id) {
-                case "2b": step2b_6(); return;
-                case "3":  step3_hop(); return;  // ← main fix: fires next gadget
-            }
-        }
-        if (currentStepInt == 70 && "2b".equals(level.id)) {
-            step2b_7();
-        }
-    }
-
-
-
-
-    /** Returns the full flat asm list; UI builds adapter from this once on load. */
-    public List<AsmLine> getAsmFlat() {
-        return asmFlat;
-    }
-
-    // ── Code helpers ──────────────────────────────────────────────────────────
-
-
-    /**
-     * Sets the active source line AND syncs the asm cursor.
-     * Prefer this over setActiveSourceLine() directly from step handlers.
-     */
-    private void setActiveSourceLine(int idx) {
-        _activeLineIndex.setValue(idx);
-        syncAsmToSourceLine(idx);
+    private void addConsole(String text, boolean isGarbage) {
+        List<Pair<String,Boolean>> list = new ArrayList<>(
+                _consoleOut.getValue() == null ? new ArrayList<>() : _consoleOut.getValue());
+        list.add(new Pair<>(text, isGarbage));
+        _consoleOut.setValue(list);
     }
 
     private int findInCode(String substr, int fromIndex) {
-        for (int i = fromIndex; i < level.code.size(); i++) {
+        for (int i = fromIndex; i < level.code.size(); i++)
             if (level.code.get(i).text.contains(substr)) return i;
-        }
         return -1;
     }
 
     private int findClosingBraceAfter(int from) {
-        for (int i = from + 1; i < level.code.size(); i++) {
+        for (int i = from + 1; i < level.code.size(); i++)
             if (level.code.get(i).text.trim().equals("}")) return i;
-        }
         return level.code.size() - 1;
     }
 
     private int findBlock(String labelStartsWith) {
-        List<StackBlock> s = getStack();
-        if (s == null) return -1;
-        for (int i = 0; i < s.size(); i++) {
-            if (s.get(i).label.startsWith(labelStartsWith)) return i;
-        }
+        List<StackBlock> s = getStack(); if (s == null) return -1;
+        for (int i = 0; i < s.size(); i++) if (s.get(i).label.startsWith(labelStartsWith)) return i;
         return -1;
     }
 
     private int findBlockIndex(List<StackBlock> stack, String labelPrefix) {
-        for (int i = 0; i < stack.size(); i++) {
-            if (stack.get(i).label.startsWith(labelPrefix)) return i;
-        }
+        for (int i = 0; i < stack.size(); i++) if (stack.get(i).label.startsWith(labelPrefix)) return i;
         return -1;
     }
 
     private void setBlockValue(List<StackBlock> stack, String labelPrefix, String value) {
-        for (StackBlock b : stack) {
-            if (b.label.startsWith(labelPrefix)) { b.value = value; return; }
-        }
+        for (StackBlock b : stack) if (b.label.startsWith(labelPrefix)) { b.value = value; return; }
     }
 
     private String extractQuoted(String text) {
-        int start = text.indexOf('"');
-        int end = text.lastIndexOf('"');
+        int start = text.indexOf('"'), end = text.lastIndexOf('"');
         if (start >= 0 && end > start) return text.substring(start + 1, end);
         return "";
     }
@@ -1040,469 +1257,18 @@ public class LevelViewModel extends ViewModel {
         return copy;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  Level 3 — Return-Oriented Programming step engine
-    // ══════════════════════════════════════════════════════════════════════════
-
-    /** Called for every "Next Step" press while on Level 3. */
-    private void handle3NextStep(float currentStep) {
-        int s = (int)(currentStep * 10);
-        switch (s) {
-            case  0: step3_intro(); break;      // show intro / NX explanation
-            case 10: step3_callVuln(); break;   // call vuln() → push return addr
-            case 20: step3_prologue(); break;   // vuln prologue
-            case 30: step3_gets(); break;       // gets() — trigger dialog
-            // 40 = waiting for payload
-            case 50: step3_ret(); break;        // leave ; ret
-            case 60: step3_hop(); break;        // gadget-hop loop
-            case 100: /* terminal — nothing */ break;
+    private void markJunk(List<StackBlock> stk, int startIdx, int endIdx) {
+        for (int i = startIdx; i <= endIdx && i < stk.size(); i++) {
+            stk.get(i).type  = StackBlock.TYPE_JUNK;
+            stk.get(i).value = "0x4141414141414141";
         }
     }
 
-    /** Stage 0: intro — main() already shown on load; jump to callVuln on first press */
-    private void step3_intro() {
-        // reset() already highlights main() via level.startCodeLine = 16.
-        // Delegate so the FIRST Next Step press is meaningful (call vuln).
-        step3_callVuln();
+    private long parseAddr(String addr) {
+        try { return Long.parseUnsignedLong(addr.toLowerCase().replace("0x",""), 16); }
+        catch (Exception e) { return 0L; }
     }
 
-
-    /** Stage 1: call vuln() — push return address */
-    private void step3_callVuln() {
-        setActiveSourceLine(findInCode("vuln();", 0));
-        _statusTitle.setValue("call vuln()");
-        _statusDesc.setValue("CPU pushes return address 0x4004b9 onto the stack, then jumps to vuln.");
-        _statusType.setValue("info");
-
-        List<StackBlock> stk = deepCopyStack(getStack());
-        // Index 2 = vuln Ret Addr
-        if (stk.size() > 2) {
-            stk.get(2).value = "0x4004b9";
-            stk.get(2).type  = StackBlock.TYPE_SAFE;
-        }
-        _stack.setValue(stk);
-        updateHexDump();
-        _espIndex.setValue(2);  // RSP now points at the saved return address
-        _step.setValue(2f);
-        recordSnapshot("call vuln()", "vuln");
-    }
-
-    /** Stage 2: vuln() prologue — push rbp, sub rsp */
-    private void step3_prologue() {
-        setActiveSourceLine(findInCode("void vuln() {", 0));
-        _statusTitle.setValue("vuln() Prologue");
-        _statusDesc.setValue("push rbp — saved frame pointer pushed. sub rsp, 0x20 — 32-byte buffer allocated for buf.");
-        _statusType.setValue("info");
-
-        List<StackBlock> stk = deepCopyStack(getStack());
-        // Index 3 = vuln Saved RBP
-        if (stk.size() > 3) {
-            stk.get(3).value = "0x7fff8";
-            stk.get(3).type  = StackBlock.TYPE_SAFE;
-        }
-        _stack.setValue(stk);
-        updateHexDump();
-        _ebpIndex.setValue(3);
-        _espIndex.setValue(7); // RSP now at bottom of buf
-        _step.setValue(3f);
-        recordSnapshot("vuln() prologue", "vuln");
-    }
-
-    /** Stage 3: gets() — pause and wait for player to build ROP chain or normal input */
-    private void step3_gets() {
-        setActiveSourceLine(findInCode("gets(buf);", 0));
-        _statusTitle.setValue("gets() — Vulnerable Read");
-        _statusDesc.setValue("gets() reads into buf[32] with no bounds check. " +
-                "Will you send a normal string, NX‑demo shellcode, or a ROP chain?");
-        _statusType.setValue("warn");
-        _step.setValue(4f);
-        recordSnapshot("gets() awaiting input", "gets@plt");
-        _getsReached.setValue(true);
-    }
-
-    /** Called from fragment when NX demo preset is selected/submitted (normal text path) */
-    public void submitNxDemoPayload() {
-        _getsReached.setValue(false);
-        _statusTitle.setValue("Shellcode on Stack — Returning...");
-        _statusType.setValue("danger");
-        _statusDesc.setValue("NX Demo: saved return address overwritten with 0x7ffd8000 (stack address). "
-                + "vuln() will try to execute code on the stack — but NX prevents it.");
-
-        List<StackBlock> stk = deepCopyStack(getStack());
-        markJunk(stk, 3, 7);
-        // Overwrite return addr with a fake stack address
-        if (stk.size() > 2) {
-            stk.get(2).value = "0x7ffd8000";
-            stk.get(2).type  = StackBlock.TYPE_DANGER;
-        }
-        _stack.setValue(stk);
-        updateHexDump();
-        _step.setValue(5f);
-        recordSnapshot("NX Demo: shellcode payload", "gets@plt");
-    }
-
-    /**
-     * Called from LevelFragment when the ROP editor fires its callback.
-     * Fills the stack with junk + gadget addresses and arms the hop engine.
-     */
-    public void submitRopPayload(List<String> payloadAddresses) {
-        _getsReached.setValue(false);
-        if (payloadAddresses == null || payloadAddresses.isEmpty()) return;
-
-        List<StackBlock> stk = deepCopyStack(getStack());
-        // Mark buf + saved rbp as junk
-        markJunk(stk, 3, 7);
-
-        // Lay the ROP chain starting at the return-address slot (index 2) and
-        // growing toward lower addresses (toward index 0 and beyond if needed).
-        int insertIdx = 2;
-        for (String addr : payloadAddresses) {
-            if (insertIdx >= 0) {
-                stk.get(insertIdx).value = addr;
-                stk.get(insertIdx).type  = StackBlock.TYPE_TARGET;
-                insertIdx--;
-            } else {
-                // Extend stack upward (lower addresses → prepend)
-                long topAddr = parseAddr(stk.get(0).address) + 8L;
-                StackBlock nb = new StackBlock(
-                        "0x" + Long.toHexString(topAddr), "ROP", addr, 8, StackBlock.TYPE_TARGET);
-                stk.add(0, nb);
-                // ESP/EBP indices shift because we prepended
-                Integer ce = _espIndex.getValue(), cb = _ebpIndex.getValue();
-                if (ce != null) _espIndex.setValue(ce + 1);
-                if (cb != null) _ebpIndex.setValue(cb + 1);
-            }
-        }
-
-        _stack.setValue(stk);
-        updateHexDump();
-
-        // Arm the hop engine
-        ropPayload = new ArrayList<>(payloadAddresses);
-        // ropPayloadPos=0 holds the first gadget address.
-        // step3_ret() will prime rop_rip = ropPayload[0] and advance ropPayloadPos to 1
-        // so that execPopGadget starts reading from index 1 (the first value).
-        ropPayloadPos = 0;
-        ropEspIdx = insertIdx + 1; // visual stack RSP pointer
-
-        _statusTitle.setValue("ROP Payload Injected!");
-        _statusType.setValue("danger");
-        _statusDesc.setValue("The return address was overwritten with gadget chain entry " +
-                ropPayload.get(0) + ". Hit Next Step to execute leave;ret and begin hopping.");
-        _step.setValue(5f);
-        recordSnapshot("ROP chain injected", "gets@plt");
-    }
-
-    /** Dismiss the gets() dialog without submitting a payload (normal value path) */
-    public void consumeGetsReached() {
-        _getsReached.setValue(false);
-    }
-
-    /** Stage 5: leave ; ret — decide what RIP lands on */
-    private void step3_ret() {
-        setActiveSourceLine(findInCode("}", findInCode("gets(buf);", 0)));
-        _statusTitle.setValue("vuln() — leave ; ret");
-        _statusType.setValue("info");
-
-        List<StackBlock> stk = getStack();
-        if (stk == null) return;
-
-        // Find what the current return-address slot contains
-        String ripTarget = "0x4004b9";
-        Integer ebpIdx = _ebpIndex.getValue();
-        if (ebpIdx != null && ebpIdx > 0 && ebpIdx < stk.size()) {
-            int retSlot = ebpIdx - 1;
-            if (retSlot >= 0) {
-                ripTarget = stk.get(retSlot).value;
-                _espIndex.setValue(retSlot);
-            }
-        }
-
-        // Detect NX‑demo case: return address is a stack address
-        if (ripTarget.startsWith("0x7ff") || ripTarget.startsWith("0x7FF")) {
-            _statusTitle.setValue("SIGSEGV — NX Blocked Execution!");
-            _statusType.setValue("danger");
-            _statusDesc.setValue("RIP = " + ripTarget + " (stack address). NX (PROT_EXEC) is set on the stack. " +
-                    "The CPU refused to execute this byte — signal SIGSEGV sent. " +
-                    "\n\nConclusion: shellcode injection FAILS when NX is active. Use ROP instead.");
-            addConsole("[1]  Killed  (SIGSEGV — NX: stack not executable)", false);
-            _step.setValue(100f);
-            recordSnapshot("SIGSEGV: NX blocked", ripTarget);
-        } else if (!ropPayload.isEmpty()) {
-            // ROP path: prime the hop engine and start hopping
-            // ropPayload[0] is already the first gadget address (== ripTarget).
-            // Advance pos to 1 so execPopGadget starts reading the first VALUE correctly.
-            rop_rip = ropPayload.get(0);
-            ropPayloadPos = 1;
-            _statusDesc.setValue("leave + ret executed. RIP = " + rop_rip +
-                    " (first gadget). Hit Next Step to execute the gadget.");
-            _step.setValue(6f);
-            recordSnapshot("ret → first gadget", rop_rip);
-        } else {
-            // Normal return
-            _statusDesc.setValue("ret executed normally. RIP = 0x4004b9 (main after vuln call).");
-            _step.setValue(100f);
-            addConsole("Program exited normally.", false);
-            recordSnapshot("normal return", "0x4004b9");
-        }
-    }
-
-    // ── Stage 6: explicit per-gadget dispatcher ────────────────────────────────────────
-    // Each known Level 3 gadget address has its own branch. Addresses are compared as
-    // longs so zero-padding differences ("0x40046a" vs "0x000000000040046a") never cause issues.
-
-    private void step3_hop() {
-        if (ropPayload.isEmpty() || ropEspIdx < 0) return;
-
-        String rip = rop_rip;
-        List<StackBlock> stk = deepCopyStack(getStack());
-
-        long ripLong;
-        try {
-            ripLong = Long.parseUnsignedLong(
-                    rip.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
-        } catch (Exception e) {
-            _statusTitle.setValue("SIGSEGV");
-            _statusType.setValue("danger");
-            _statusDesc.setValue("RIP = " + rip + " is not a valid address.");
-            addConsole("[1]  Killed  (SIGSEGV — bad RIP)", false);
-            _step.setValue(100f);
-            return;
-        }
-
-        if      (ripLong == 0x40046aL) execPopGadget("rax", "pop rax ; ret", rip, stk);
-        else if (ripLong == 0x400473L) execPopGadget("rdi", "pop rdi ; ret", rip, stk);
-        else if (ripLong == 0x40047cL) execPopGadget("rsi", "pop rsi ; ret", rip, stk);
-        else if (ripLong == 0x400485L) execPopGadget("rdx", "pop rdx ; ret", rip, stk);
-        else if (ripLong == 0x40048eL) execSyscall(rip, stk);
-        else {
-            _statusTitle.setValue("SIGSEGV — Unknown Address");
-            _statusType.setValue("danger");
-            _statusDesc.setValue(
-                    "RIP = " + rip + " does not match any known gadget.\n" +
-                    "Known: 0x40046a (pop rax), 0x400473 (pop rdi), " +
-                    "0x40047c (pop rsi), 0x400485 (pop rdx), 0x40048e (syscall).");
-            addConsole("[1]  Killed  (SIGSEGV — invalid gadget " + rip + ")", false);
-            _step.setValue(100f);
-            recordSnapshot("SIGSEGV", rip);
-        }
-    }
-
-    /**
-     * pop <reg> ; ret
-     *
-     * Execution model (mirrors real x86-64):
-     *   pop reg  →  reg = ropPayload[ropPayloadPos]  ;  RSP += 8  (ropPayloadPos++)
-     *   ret      →  RIP = ropPayload[ropPayloadPos]  ;  RSP += 8  (ropPayloadPos++)
-     *
-     * ropPayload is the canonical source of truth; stk is for visual output only.
-     */
-    private void execPopGadget(String reg, String asmText, String ripAddr,
-                               List<StackBlock> stk) {
-        // pop <reg>: consume one value from the payload stream
-        String val = (ropPayloadPos < ropPayload.size()) ? ropPayload.get(ropPayloadPos) : "0x0";
-        setRopReg(reg, val);
-        ropPayloadPos++;
-        ropEspIdx++;   // keep visual RSP in sync
-
-        // ret: next item is the new RIP
-        if (ropPayloadPos < ropPayload.size()) {
-            rop_rip = ropPayload.get(ropPayloadPos);
-            ropPayloadPos++;
-            ropEspIdx++;
-        } else {
-            rop_rip = "END";
-        }
-        _espIndex.setValue(ropEspIdx);
-
-        String regUp    = reg.toUpperCase(java.util.Locale.US);
-        String valShown = getRopReg(reg);
-        _statusTitle.setValue(asmText);
-        _statusType.setValue("info");
-        _statusDesc.setValue(regUp + " ← " + valShown + "   |   next RIP → " + rop_rip);
-        _stack.setValue(stk);
-        updateHexDump();
-        emitGdbContext(ripAddr, asmText, regUp, stk);
-        _step.setValue(6f);
-        recordSnapshot(asmText, rop_rip);
-    }
-
-    /** syscall: check win condition, emit GDB context, print result. */
-    private void execSyscall(String ripAddr, List<StackBlock> stk) {
-        boolean win = false;
-        try {
-            long raxV = parseAddrLong(rop_rax);
-            long rdiV = parseAddrLong(rop_rdi);
-            long rsiV = parseAddrLong(rop_rsi);
-            long rdxV = parseAddrLong(rop_rdx);
-            // Resolve the real binsh address from the gadget list at runtime
-            long binshAddr = resolveBinshAddr();
-            win = (raxV == 59 && rdiV == binshAddr && rsiV == 0 && rdxV == 0);
-        } catch (Exception ignored) {}
-
-        emitGdbContext(ripAddr, "syscall", null, stk);
-
-        if (win) {
-            _statusTitle.setValue("execve(\"/bin/sh\", 0, 0) — Shell!");
-            _statusType.setValue("success");
-            _statusDesc.setValue(
-                    "syscall #59 executed — all args correct:\n" +
-                    "  RAX = 59  (execve)\n" +
-                    "  RDI = " + String.format("0x%x", resolveBinshAddr()) + "  (→ /bin/sh)\n" +
-                    "  RSI = 0  (argv = NULL)\n" +
-                    "  RDX = 0  (envp = NULL)\n" +
-                    "NX bypassed — no shellcode injected, only existing binary code used.");
-            addConsole("", false);
-            addConsole("$ id", true);
-            addConsole("uid=0(root) gid=0(root) groups=0(root)", false);
-            addConsole("$ echo $0", true);
-            addConsole("/bin/sh", false);
-            addConsole("$ SHELL OBTAINED — flag{r0p_ch4in_nx_byp4ss}", false);
-            _toast.setValue(new Pair<>("\uD83D\uDCA5 Shell obtained via ROP!", true));
-        } else {
-            _statusTitle.setValue("syscall — Wrong Arguments");
-            _statusType.setValue("danger");
-            _statusDesc.setValue(
-                    "syscall fired but args were wrong:\n" +
-                    "  RAX = " + rop_rax + "  (need 59 / 0x3b)\n" +
-                    "  RDI = " + rop_rdi + "  (need " + String.format("0x%x", resolveBinshAddr()) + " = /bin/sh)\n" +
-                    "  RSI = " + rop_rsi + "  (need 0)\n" +
-                    "  RDX = " + rop_rdx + "  (need 0)");
-            addConsole("[1]  Killed  (bad syscall args)", false);
-        }
-        _step.setValue(100f);
-        recordSnapshot("syscall", "0x40048e");
-    }
-
-    /**
-     * Emits a pwndbg-style GDB context block to the console.
-     * Code → Registers → Stack, one addConsole line at a time.
-     */
-    private void emitGdbContext(String ripAddr, String asmText,
-                                @Nullable String changedReg,
-                                List<StackBlock> stk) {
-        ropHopCount++;
-        String H = "────────────────────────────────────────";
-
-        // ── CODE ─────────────────────────────────────────────────────────────
-        addConsole("", false);
-        addConsole(H + "[ code ]" + H, false);
-
-        // Split multi-instruction gadgets on " ; "
-        String[] instrs = asmText.split(" ; ");
-        for (int i = 0; i < instrs.length; i++) {
-            String prefix = (i == 0) ? " ►  " : "     ";
-            addConsole(prefix + ripAddr + "    " + instrs[i].trim(), false);
-        }
-
-        // Show the next gadget address if known
-        if (!"END".equals(rop_rip) && !rop_rip.equals(ripAddr)) {
-            String nextAsm = gadgetAsmForAddr(rop_rip);
-            String nextLabel = (nextAsm != null) ? nextAsm : "??";
-            addConsole("      " + rop_rip + "    " + nextLabel + "  ← next", false);
-        }
-
-        // ── REGISTERS ────────────────────────────────────────────────────────
-        addConsole(H + "[ regs ]" + H, false);
-        addConsole(regLine("RIP", ripAddr,  false,         null),         false);
-        addConsole(regLine("RAX", rop_rax,  "RAX".equals(changedReg), "execve" ), false);
-        addConsole(regLine("RDI", rop_rdi,  "RDI".equals(changedReg), "/bin/sh"), false);
-        addConsole(regLine("RSI", rop_rsi,  "RSI".equals(changedReg), null     ), false);
-        addConsole(regLine("RDX", rop_rdx,  "RDX".equals(changedReg), null     ), false);
-
-        String rspAddr = (ropEspIdx >= 0 && ropEspIdx < stk.size())
-                         ? stk.get(ropEspIdx).address : "0x???";
-        addConsole(regLine("RSP", rspAddr, false, null), false);
-
-        // ── STACK ─────────────────────────────────────────────────────────────
-        addConsole(H + "[ stack ]" + H, false);
-        long baseRsp;
-        try {
-            baseRsp = Long.parseUnsignedLong(
-                    rspAddr.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
-        } catch (Exception e) { baseRsp = 0; }
-
-        int startSlot = Math.max(0, ropEspIdx - 1);
-        int endSlot   = Math.min(stk.size() - 1, startSlot + 5);
-        for (int i = startSlot; i <= endSlot; i++) {
-            StackBlock b = stk.get(i);
-            long slotAddr;
-            try {
-                slotAddr = Long.parseUnsignedLong(
-                        b.address.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
-            } catch (Exception e) { slotAddr = 0; }
-
-            long delta = slotAddr - baseRsp;
-            // Format offset as signed decimal (+8, -8, +0x10 …)
-            String offsetStr = (delta >= 0 ? "+" : "") + delta;
-
-            String rspTag = (i == ropEspIdx) ? "  ← $rsp" : "";
-            String alias  = aliasForAddr(b.value);
-            String note   = (alias != null) ? "  [" + alias + "]" : "";
-            addConsole("  " + b.address + "│" + offsetStr + ": "
-                    + b.value + rspTag + note, false);
-        }
-        addConsole(H + H, false);
-    }
-
-    /** One "REG  0x…  ← changed  hint" line */
-    private String regLine(String name, String val, boolean changed, @Nullable String hint) {
-        String arrow   = changed ? "  \u2190 changed" : "";
-        String hintStr = (hint != null && changed) ? "  (\"" + hint + "\")" : "";
-        return String.format(java.util.Locale.US,
-                "   %-3s  %-20s%s%s", name, val, arrow, hintStr);
-    }
-
-    /** Full ASM string (with instructions split on newlines) for a gadget address */
-    private String fullGadgetAsmForAddr(String addr) {
-        if (level == null) return addr;
-        try {
-            long target = Long.parseUnsignedLong(
-                    addr.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
-            for (com.example.secviz.data.RopGadget g : level.ropGadgets) {
-                long ga = Long.parseUnsignedLong(
-                        g.address.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
-                if (ga == target) return g.asm.replace(" ; ", "\n         ");
-            }
-        } catch (Exception ignored) {}
-        return addr;
-    }
-
-    /** Short ASM string for a gadget address, or null if not found */
-    @Nullable
-    private String gadgetAsmForAddr(String addr) {
-        if (level == null) return null;
-        try {
-            long target = Long.parseUnsignedLong(
-                    addr.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
-            for (com.example.secviz.data.RopGadget g : level.ropGadgets) {
-                long ga = Long.parseUnsignedLong(
-                        g.address.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
-                if (ga == target) return g.asm;
-            }
-        } catch (Exception ignored) {}
-        return null;
-    }
-
-    /**
-     * Returns the binsh address from the Level's gadget list (the gadget whose alias
-     * is "/bin/sh"). Falls back to 0x403010 if not found.
-     */
-    private long resolveBinshAddr() {
-        if (level != null) {
-            for (com.example.secviz.data.RopGadget g : level.ropGadgets) {
-                if ("/bin/sh".equals(g.alias)) {
-                    try {
-                        return Long.parseUnsignedLong(
-                                g.address.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
-                    } catch (Exception ignored) {}
-                }
-            }
-        }
-        return 0x403010L; // fallback
-    }
-
-    /** Return the chain alias for a value, or null */
     @Nullable
     private String aliasForAddr(String val) {
         if (level == null || val == null) return null;
@@ -1516,129 +1282,59 @@ public class LevelViewModel extends ViewModel {
         return null;
     }
 
-    private void markJunk(List<StackBlock> stk, int startIdx, int endIdx) {
-        for (int i = startIdx; i <= endIdx && i < stk.size(); i++) {
-            stk.get(i).type  = StackBlock.TYPE_JUNK;
-            stk.get(i).value = "0x4141414141414141";
-        }
-    }
-
     @Nullable
-    private String gadgetNameForAddr(String addr) {
+    private String gadgetAsmForAddr(String addr) {
         if (level == null) return null;
         try {
-            long target = Long.parseUnsignedLong(
-                    addr.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
+            long target = Long.parseUnsignedLong(addr.toLowerCase().replace("0x",""), 16);
             for (com.example.secviz.data.RopGadget g : level.ropGadgets) {
-                long ga = Long.parseUnsignedLong(
-                        g.address.toLowerCase(java.util.Locale.US).replace("0x", ""), 16);
-                if (ga == target) {
-                    // Return just the first instruction (before ;)
-                    int sc = g.asm.indexOf(';');
-                    return sc > 0 ? g.asm.substring(0, sc).trim() : g.asm.trim();
-                }
+                long ga = Long.parseUnsignedLong(g.address.toLowerCase().replace("0x",""), 16);
+                if (ga == target) return g.asm;
             }
         } catch (Exception ignored) {}
         return null;
     }
 
-
-    private void setRopReg(String reg, String val) {
-        switch (reg.toLowerCase()) {
-            case "rdi": rop_rdi = val; break;
-            case "rsi": rop_rsi = val; break;
-            case "rdx": rop_rdx = val; break;
-            case "rax": rop_rax = val; break;
-        }
-    }
-
-    private String getRopReg(String reg) {
-        switch (reg.toLowerCase()) {
-            case "rdi": return rop_rdi;
-            case "rsi": return rop_rsi;
-            case "rdx": return rop_rdx;
-            case "rax": return rop_rax;
-            default:    return "0x0000000000000000";
-        }
-    }
-
-    private long parseAddr(String addr) {
-        try {
-            return Long.parseUnsignedLong(addr.toLowerCase().replace("0x", ""), 16);
-        } catch (Exception e) { return 0L; }
-    }
-
-    private long parseAddrLong(String addr) {
-        return parseAddr(addr);
-    }
-
     // ── Register Snapshot Recorder ────────────────────────────────────────────
 
-    /**
-     * Captures the current register state and appends it to the timeline.
-     *
-     * @param label     Short human-readable step description
-     * @param ripSymbol A symbolic RIP hint (e.g., "main", "vuln", "read@plt")
-     */
     public void recordSnapshot(String label, String ripSymbol) {
         if (!Boolean.TRUE.equals(_captureEnabled.getValue())) return;
-
         List<StackBlock> s = getStack();
-
-        // Derive RSP address from current ESP block
         String rsp = "—", rbp = "—";
-        Integer espIdx = _espIndex.getValue();
-        Integer ebpIdx = _ebpIndex.getValue();
-        if (s != null && espIdx != null && espIdx >= 0 && espIdx < s.size())
-            rsp = s.get(espIdx).address;
-        if (s != null && ebpIdx != null && ebpIdx >= 0 && ebpIdx < s.size())
-            rbp = s.get(ebpIdx).address;
-
-        // RIP: derive from active code line's first asm instruction or use symbol
+        Integer espIdx = _espIndex.getValue(), ebpIdx = _ebpIndex.getValue();
+        if (s != null && espIdx != null && espIdx >= 0 && espIdx < s.size()) rsp = s.get(espIdx).address;
+        if (s != null && ebpIdx != null && ebpIdx >= 0 && ebpIdx < s.size()) rbp = s.get(ebpIdx).address;
         String rip = ripSymbol;
         Integer lineIdx = _activeLineIndex.getValue();
         if (lineIdx != null && level != null && lineIdx < level.code.size()) {
-            java.util.List<String> asm = level.code.get(lineIdx).asm;
+            List<String> asm = level.code.get(lineIdx).asm;
             if (asm != null && !asm.isEmpty()) {
-                String firstAsm = asm.get(0).trim();
-                // Extract address from "  401234:   push rbp" format
-                int colon = firstAsm.indexOf(':');
-                if (colon > 0) rip = "0x" + firstAsm.substring(0, colon).trim();
+                String first = asm.get(0).trim(); int colon = first.indexOf(':');
+                if (colon > 0) rip = "0x" + first.substring(0, colon).trim();
             }
         }
-
         String statusType = _statusType.getValue() == null ? "info" : _statusType.getValue();
-
         List<RegisterSnapshot> current = _snapshots.getValue();
         int active = _activeSnapshotIndex.getValue() == null ? -1 : _activeSnapshotIndex.getValue();
-
-        // If we rewound the timeline and are now taking a new action, overwrite the future
         if (current != null && active >= 0 && active < current.size() - 1) {
             current = new ArrayList<>(current.subList(0, active + 1));
             snapshotCount = current.size();
         }
-
         List<RegisterSnapshot> next = current == null ? new ArrayList<>() : new ArrayList<>(current);
         int codeLine = lineIdx == null ? 0 : lineIdx;
-
         float simStep = _step.getValue() == null ? 0f : _step.getValue();
         List<StackBlock> simStack = s == null ? new ArrayList<>() : deepCopyStack(s);
-        int simEsp = espIdx == null ? 0 : espIdx;
-        int simEbp = ebpIdx == null ? 0 : ebpIdx;
+        int simEsp = espIdx == null ? 0 : espIdx, simEbp = ebpIdx == null ? 0 : ebpIdx;
         String simStatusTitle = _statusTitle.getValue() == null ? "" : _statusTitle.getValue();
-        String simStatusDesc = _statusDesc.getValue() == null ? "" : _statusDesc.getValue();
-        List<Pair<String, Boolean>> simConsole = _consoleOut.getValue() == null ? new ArrayList<>() : new ArrayList<>(_consoleOut.getValue());
-
-        next.add(new RegisterSnapshot(snapshotCount++, label, rip, rsp, rbp, statusType, codeLine,
-                simStep, simStack, simEsp, simEbp, simStatusTitle, simStatusDesc, simConsole));
+        String simStatusDesc  = _statusDesc.getValue()  == null ? "" : _statusDesc.getValue();
+        List<Pair<String,Boolean>> simConsole = _consoleOut.getValue() == null
+                ? new ArrayList<>() : new ArrayList<>(_consoleOut.getValue());
+        next.add(new RegisterSnapshot(snapshotCount++, label, rip, rsp, rbp, statusType,
+                codeLine, simStep, simStack, simEsp, simEbp, simStatusTitle, simStatusDesc, simConsole));
         _snapshots.setValue(next);
         _activeSnapshotIndex.setValue(snapshotCount - 1);
     }
 
-    /**
-     * Time-travel Debugging: Restores the simulation exactly to the captured state.
-     * Truncates the timeline history back to this point so execution diverges from here.
-     */
     public void restoreSnapshot(RegisterSnapshot snap) {
         _step.setValue(snap.simStep);
         _activeLineIndex.setValue(snap.codeLine);
@@ -1649,81 +1345,44 @@ public class LevelViewModel extends ViewModel {
         _statusDesc.setValue(snap.simStatusDesc);
         _statusType.setValue(snap.statusType);
         _consoleOut.setValue(new ArrayList<>(snap.simConsole));
-
         updateHexDump();
-
-        // Do not truncate the timeline yet. Just move the active viewing index.
         _activeSnapshotIndex.setValue(snap.stepIndex);
     }
 
-
     // ── Hex Dump Builder ──────────────────────────────────────────────────────
 
-    /**
-     * Converts the current stack into rows of 16 bytes for the hex dump panel.
-     * Each Object[] entry: { address:String, bytes:byte[16], status:int[16] }
-     * status values: 0=empty, 1=filled(safe), 2=overflow(danger)
-     */
     private void updateHexDump() {
-        List<StackBlock> s = getStack();
-        if (s == null) return;
-
-        // Collect all blocks that are part of the visible region (buff + adjacent)
-        // We build a flat byte array representing them from bottom-address to top
-        // For simplicity, present each 8-byte block as one hex row half.
+        List<StackBlock> s = getStack(); if (s == null) return;
         List<Object[]> rows = new ArrayList<>();
-
-        // Walk stack in reverse (ascending address order = bottom to top on screen)
         for (int i = s.size() - 1; i >= 0; i--) {
             StackBlock block = s.get(i);
-            // Skip the very top main frame data block
             if (block.type.equals(StackBlock.TYPE_MAIN_FRAME) && !block.label.contains("Return")) continue;
-
             String rawValue = block.value;
             byte[] blockBytes = new byte[8];
-            int status = 0; // empty
-
+            int status = 0;
             if (!rawValue.equals("0x0") && !rawValue.equals("0x...") && !rawValue.isEmpty()) {
-                // Determine status from block type
                 if (block.type.equals(StackBlock.TYPE_DANGER)) status = 2;
-                else if (block.type.equals(StackBlock.TYPE_FILLED) ||
-                         block.type.equals(StackBlock.TYPE_WARN) ||
-                         block.type.equals(StackBlock.TYPE_SAFE)) status = 1;
-                else status = 0;
-
-                // Encode the string value as UTF-8 bytes (truncated/padded to 8)
+                else if (block.type.equals(StackBlock.TYPE_FILLED) || block.type.equals(StackBlock.TYPE_WARN)
+                        || block.type.equals(StackBlock.TYPE_SAFE)) status = 1;
                 if (rawValue.startsWith("0x")) {
-                    // Looks like an address hex value — encode as little-endian
                     try {
                         long addr = Long.parseUnsignedLong(rawValue.substring(2), 16);
-                        for (int b2 = 0; b2 < 8; b2++) {
-                            blockBytes[b2] = (byte)(addr & 0xFF);
-                            addr >>= 8;
-                        }
-                        if (status == 0) status = 1; // addresses count as filled
+                        for (int b2 = 0; b2 < 8; b2++) { blockBytes[b2] = (byte)(addr & 0xFF); addr >>= 8; }
+                        if (status == 0) status = 1;
                     } catch (NumberFormatException e) {
-                        byte[] encoded = rawValue.getBytes();
-                        System.arraycopy(encoded, 0, blockBytes, 0,
-                                Math.min(encoded.length, 8));
+                        byte[] enc = rawValue.getBytes();
+                        System.arraycopy(enc, 0, blockBytes, 0, Math.min(enc.length, 8));
                     }
                 } else {
-                    byte[] encoded = rawValue.getBytes();
-                    System.arraycopy(encoded, 0, blockBytes, 0,
-                            Math.min(encoded.length, 8));
+                    byte[] enc = rawValue.getBytes();
+                    System.arraycopy(enc, 0, blockBytes, 0, Math.min(enc.length, 8));
                 }
             }
-
-            // Emit one row per 8-byte block (addr | 8 hex bytes | 8 ascii)
-            // We pair two consecutive blocks into one 16-byte row if possible,
-            // but for clarity emit 8-byte half-rows here and let the adapter pair them.
-            byte[] rowBytes = new byte[16];
-            int[] rowStatus = new int[16];
+            byte[] rowBytes = new byte[16]; int[] rowStatus = new int[16];
             System.arraycopy(blockBytes, 0, rowBytes, 0, 8);
-            // second half empty — adapter shows partial rows fine
             for (int j = 0; j < 8; j++) rowStatus[j] = status;
             rows.add(new Object[]{block.address, rowBytes, rowStatus});
         }
-
         _hexRows.setValue(rows);
     }
 }

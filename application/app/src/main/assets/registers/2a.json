@@ -1,0 +1,62 @@
+{
+  "_comment": "Level 2A — Leaking Secrets. Stack: 0x7fff4 main Saved EBP | 0x7ffec vuln Ret Addr | 0x7ffe4 vuln Saved EBP | 0x7ffdc secret[8..15] | 0x7ffd4 secret[0..7] | 0x7ffcc buff[8..15] | 0x7ffc4 buff[0..7]",
+
+  "4004e3": { "RSP": "0x7fff4", "RBP": "0x7ffffc", "RIP": "0x4004e3" },
+  "4004e4": { "RSP": "0x7fff4", "RBP": "0x7fff4",  "RIP": "0x4004e4" },
+  "4004e7": { "RSP": "0x7ffec", "RBP": "0x7fff4",  "RIP": "0x4004e7",
+              "_note": "call vuln — pushed ret addr 0x4004f1" },
+
+  "400486": { "RSP": "0x7ffe4", "RBP": "0x7fff4",  "RIP": "0x400486",
+              "_note": "push rbp in vuln" },
+  "400487": { "RSP": "0x7ffe4", "RBP": "0x7ffe4",  "RIP": "0x400487" },
+  "40048a": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x40048a",
+              "_note": "sub rsp,0x20 = 32 bytes" },
+
+  "40048e": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x40048e",
+              "RAX": "0x45535f5245505553",
+              "_note": "movabs rax, 'SUPER_SE'" },
+  "400498": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x400498",
+              "RAX": "0x45535f5245505553", "RDX": "0x59454b5f54455243",
+              "_note": "movabs rdx, 'CRET_KEY'" },
+  "4004a2": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004a2",
+              "RAX": "0x45535f5245505553",
+              "_note": "mov [rbp-0x10], rax — stores secret_key part 1" },
+  "4004a6": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004a6",
+              "RDX": "0x59454b5f54455243",
+              "_note": "mov [rbp-0x8], rdx — stores secret_key part 2" },
+
+  "4004aa": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004aa",
+              "RDI": "0x4011e8", "_note": "mov edi, puts arg (string addr)" },
+  "4004af": { "RSP": "0x7ffbc", "RBP": "0x7ffe4",  "RIP": "0x4004af",
+              "_note": "call puts('Enter your name:')" },
+
+  "4004b4": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004b4",
+              "RAX": "0x7ffc4", "_note": "lea rax,[rbp-0x20] = buff" },
+  "4004b8": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004b8",
+              "RAX": "0x7ffc4", "RDX": "0x10" },
+  "4004bd": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004bd",
+              "RAX": "0x7ffc4", "RDX": "0x10", "RSI": "0x7ffc4" },
+  "4004c0": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004c0",
+              "RAX": "0x7ffc4", "RDX": "0x10", "RSI": "0x7ffc4", "RDI": "0x1" },
+  "4004c5": { "RSP": "0x7ffbc", "RBP": "0x7ffe4",  "RIP": "0x4004c5",
+              "RDI": "0x1", "RSI": "0x7ffc4", "RDX": "0x10",
+              "_note": "call read(1, buff, 16)" },
+
+  "4004ca": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004ca",
+              "RAX": "0x7ffc4", "_note": "lea rax,[rbp-0x20] = buff (for printf)" },
+  "4004ce": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004ce",
+              "RAX": "0x7ffc4", "RSI": "0x7ffc4" },
+  "4004d1": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004d1",
+              "RSI": "0x7ffc4", "RDI": "0x4011fa" },
+  "4004d6": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004d6",
+              "RAX": "0x0", "RSI": "0x7ffc4", "RDI": "0x4011fa" },
+  "4004db": { "RSP": "0x7ffbc", "RBP": "0x7ffe4",  "RIP": "0x4004db",
+              "_note": "call printf('Hello %s', buff)" },
+
+  "4004e0": { "RSP": "0x7ffc4", "RBP": "0x7ffe4",  "RIP": "0x4004e0" },
+  "4004e1": { "RSP": "0x7ffec", "RBP": "0x7ffe4",  "RIP": "0x4004e1", "_note": "leave" },
+  "4004e2": { "RSP": "0x7fff4", "RBP": "0x7fff4",  "RIP": "0x4004e2", "_note": "ret to main" },
+
+  "4004f1": { "RSP": "0x7fffc", "RBP": "0x7ffffc", "RIP": "0x4004f1", "RAX": "0x0" },
+  "4004f2": { "RSP": "0x7ffffc","RBP": "0x7ffffc", "RIP": "0x4004f2" }
+}
