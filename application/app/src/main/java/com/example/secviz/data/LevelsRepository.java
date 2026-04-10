@@ -207,7 +207,12 @@ public class LevelsRepository {
                 new DefensePatch(
                         "    read(1, buff, 100); // User inputs > 24 bytes to crash",
                         "    read(1, buff, 16); // Safely read only 16 bytes max!"),
-                objdump1));
+                objdump1,
+                new ArrayList<>(), // ropGadgets
+                "💡 buff is 16 bytes. saved RBP is 8 bytes.\n" +
+                "To reach the return address you need 16 + 8 = 24 bytes of junk, " +
+                "then any extra bytes will corrupt the return address.\n\n" +
+                "Try entering 25+ characters — the last ones will spill into the return address slot and crash the process."));
 
         // ── LEVEL 2A: Leaking Secrets ────────────────────────────────────────
         List<CodeLine> code2a = new ArrayList<>();
@@ -256,13 +261,14 @@ public class LevelsRepository {
                 "  4004f2:       ret"));
 
         List<StackBlock> stack2a = new ArrayList<>();
-        stack2a.add(new StackBlock("0x7fff4", "main Saved EBP", "0x7fff0", 8, StackBlock.TYPE_MAIN_FRAME));
+        stack2a.add(new StackBlock("0x7fffc", "main Return Addr", "0x7fa2b", 8, StackBlock.TYPE_MAIN_FRAME));
+        stack2a.add(new StackBlock("0x7fff4", "main Saved EBP",   "0x7fff0", 8, StackBlock.TYPE_MAIN_FRAME));
         stack2a.add(new StackBlock("0x7ffec", "vuln Return Addr", "0x00000", 8, StackBlock.TYPE_SAFE));
-        stack2a.add(new StackBlock("0x7ffe4", "vuln Saved EBP", "0x00000", 8, StackBlock.TYPE_SAFE));
-        stack2a.add(new StackBlock("0x7ffdc", "secret_key[8..15]", "0x0", 8, StackBlock.TYPE_WARN));
-        stack2a.add(new StackBlock("0x7ffd4", "secret_key[0..7]", "0x0", 8, StackBlock.TYPE_WARN));
+        stack2a.add(new StackBlock("0x7ffe4", "vuln Saved EBP",   "0x00000", 8, StackBlock.TYPE_SAFE));
+        stack2a.add(new StackBlock("0x7ffdc", "secret_key[8..15]", "0x0",   8, StackBlock.TYPE_WARN));
+        stack2a.add(new StackBlock("0x7ffd4", "secret_key[0..7]",  "0x0",   8, StackBlock.TYPE_WARN));
         stack2a.add(new StackBlock("0x7ffcc", "buff[8..15]", "0x0", 8, StackBlock.TYPE_NEUTRAL));
-        stack2a.add(new StackBlock("0x7ffc4", "buff[0..7]", "0x0", 8, StackBlock.TYPE_NEUTRAL));
+        stack2a.add(new StackBlock("0x7ffc4", "buff[0..7]",  "0x0", 8, StackBlock.TYPE_NEUTRAL));
 
         List<String[]> presets2a = new ArrayList<>();
         presets2a.add(new String[]{"Safe", "Hi!"});
@@ -391,9 +397,7 @@ public class LevelsRepository {
                         "  400487:       48 89 e5                mov    rbp,rsp\n" +
                         "  40048a:       48 83 ec 20             sub    rsp,0x20\n" +
                         "  40048e:       48 b8 53 55 50 45 52    movabs rax,0x45535f5245505553\n" +
-                        "  400495:       5f 53 45\n" +
                         "  400498:       48 ba 43 52 45 54 5f    movabs rdx,0x59454b5f54455243\n" +
-                        "  40049f:       4b 45 59\n" +
                         "  4004a2:       48 89 45 f0             mov    QWORD PTR [rbp-0x10],rax\n" +
                         "  4004a6:       48 89 55 f8             mov    QWORD PTR [rbp-0x8],rdx\n" +
                         "  4004aa:       bf e8 11 40 00          mov    edi,0x4011e8\n" +
@@ -437,8 +441,13 @@ public class LevelsRepository {
                 10, code2a, stack2a, presets2a,
                 new DefensePatch(
                         "    read(1, buff, 16); // Safe length, but no null-terminator appended!",
-                        "    read(1, buff, 15); buff[15] = '\\0'; // Null-terminator secures the secret!"),
-                objdump2a));
+                        "    read(1, buff, 15); buff[15] = '\0'; // Null-terminator secures the secret!"),
+                objdump2a,
+                new ArrayList<>(), // ropGadgets
+                "💡 buff is 16 bytes, secret_key is right above it in memory.\n" +
+                "read() does NOT add a null terminator — so if you fill buff completely, " +
+                "printf(\"%s\") will keep reading past buff into secret_key until it finds \\0.\n\n" +
+                "Enter exactly 16 characters (use the 'Leak Secret' preset) and watch printf print the secret!"));
 
         // ── LEVEL 2B: Control Flow Hijack ────────────────────────────────────
         List<CodeLine> code2b = new ArrayList<>();
@@ -545,7 +554,14 @@ public class LevelsRepository {
                 "You overflowed buf (32 bytes) and saved RBP (8 bytes), then overwrote the return address with win()'s address (0x400476). When vuln() returned, RIP jumped directly to win().",
                 8, code2b, stack2b, new ArrayList<>(),
                 null,   // no defense patch for this level
-                objdump2b));
+                objdump2b,
+                new ArrayList<>(), // ropGadgets
+                "💡 buf is 32 bytes. saved RBP is 8 bytes above it.\n" +
+                "To reach the return address you need 32 + 8 = 40 bytes of junk, " +
+                "then write win()'s address.\n\n" +
+                "Open the Objdump viewer ({ }) to find win()'s address. " +
+                "Then use Generate Payload: select buf[0..7] → buf[24..31] + saved RBP as junk, " +
+                "and place win()'s address at 'vuln Return Addr'."));
 
         // ── LEVEL 3: Return-Oriented Programming (ROP) — real binary ─────────
         List<CodeLine> code3 = new ArrayList<>();
@@ -743,7 +759,15 @@ public class LevelsRepository {
                 "No new code was injected. Every byte you executed already lived in the binary. " +
                 "NX only prevents running *new* code on the stack — ROP reuses *existing* code " +
                 "in executable (.text) sections, completely bypassing the protection.",
-                16, code3, stack3, presets3, null, objdump3, gadgets3));
+                16, code3, stack3, presets3, null, objdump3, gadgets3,
+                "💡 Goal: execve(\"/bin/sh\", 0, 0) via syscall (RAX=59).\n\n" +
+                "Chain order:\n" +
+                "  1. pop rax ; ret  → 0x3b (59)\n" +
+                "  2. pop rdi ; ret  → 0x403010 (address of /bin/sh string)\n" +
+                "  3. pop rsi ; ret  → 0x0\n" +
+                "  4. pop rdx ; ret  → 0x0\n" +
+                "  5. syscall\n\n" +
+                "All gadget addresses are in the binary. Use the ROP Scanner to find them."));
 
 
         return levels;

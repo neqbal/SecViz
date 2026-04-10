@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#161B22"
+    android:paddingTop="8dp"
+    android:paddingBottom="32dp"
+    android:paddingHorizontal="20dp">
+
+    <!-- Drag handle -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="20dp"
+        android:background="#3D444D"
+        android:backgroundTintMode="src_atop"/>
+
+    <!-- Header row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="💡  Hint"
+            android:textColor="#E6EDF3"
+            android:textSize="18sp"
+            android:fontFamily="monospace"
+            android:textStyle="bold"/>
+
+        <!-- Show / Hide toggle button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_show_hint"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Show Hint"
+            android:textColor="#58A6FF"
+            android:textSize="13sp"
+            app:strokeColor="#30363D"
+            xmlns:app="http://schemas.android.com/apk/res-auto"/>
+    </LinearLayout>
+
+    <!-- Separator -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#21262D"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Lock icon when hidden -->
+    <LinearLayout
+        android:id="@+id/layout_hint_locked"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingVertical="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔒"
+            android:textSize="36sp"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Hint is hidden"
+            android:textColor="#8B949E"
+            android:textSize="14sp"
+            android:fontFamily="monospace"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Press 'Show Hint' to reveal it"
+            android:textColor="#3D444D"
+            android:textSize="12sp"
+            android:layout_marginTop="4dp"/>
+    </LinearLayout>
+
+    <!-- Hint text (revealed when Show Hint pressed) -->
+    <TextView
+        android:id="@+id/tv_hint_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:textColor="#C9D1D9"
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        android:lineSpacingExtra="4dp"
+        android:background="#0D1117"
+        android:padding="16dp"
+        android:textIsSelectable="true"/>
+
+</LinearLayout>

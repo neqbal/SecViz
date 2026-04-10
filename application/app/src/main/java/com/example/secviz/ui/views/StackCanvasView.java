@@ -9,7 +9,10 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.AttributeSet;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -34,11 +37,24 @@ public class StackCanvasView extends View {
         void onBlockTapped(int blockIndex);
     }
 
+    /** Long-press on any stack block — fires regardless of selectionMode. */
+    public interface BlockLongPressListener {
+        void onBlockLongPressed(int blockIndex, StackBlock block);
+    }
+
     private SelectionMode selectionMode = SelectionMode.NONE;
     private int junkStartIndex = -1;
     private int junkEndIndex   = -1;
     private int targetIndex    = -1;
     private BlockTapListener blockTapListener;
+    private BlockLongPressListener blockLongPressListener;
+
+    // Long-press detection
+    private static final long LONG_PRESS_MS = 450;
+    private final Handler longPressHandler = new Handler(Looper.getMainLooper());
+    private Runnable longPressRunnable;
+    private int longPressCandidateIdx = -1;
+    private boolean longPressFired = false;
 
     // ── Simulation state ──────────────────────────────────────────────────────
     private List<StackBlock> stack = new ArrayList<>();
@@ -120,6 +136,12 @@ public class StackCanvasView extends View {
 
     public void setBlockTapListener(BlockTapListener listener) {
         this.blockTapListener = listener;
+        setClickable(true); // always accept touch so long-press works
+    }
+
+    public void setBlockLongPressListener(BlockLongPressListener listener) {
+        this.blockLongPressListener = listener;
+        setClickable(true);
     }
 
     /** Programmatically mark the junk range (after wizard logic resolves order). */
@@ -175,15 +197,46 @@ public class StackCanvasView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (selectionMode == SelectionMode.NONE) return super.onTouchEvent(event);
-        if (event.getAction() != MotionEvent.ACTION_UP) return true;
-
         float touchY = event.getY();
-        int tappedBlock = blockIndexFromY(touchY);
-        if (tappedBlock >= 0 && tappedBlock < stack.size() && blockTapListener != null) {
-            blockTapListener.onBlockTapped(tappedBlock);
+        int blockIdx = blockIndexFromY(touchY);
+
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                longPressFired = false;
+                longPressCandidateIdx = blockIdx;
+                if (blockIdx >= 0 && blockLongPressListener != null) {
+                    longPressRunnable = () -> {
+                        if (blockIdx < stack.size()) {
+                            longPressFired = true;
+                            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                            blockLongPressListener.onBlockLongPressed(blockIdx, stack.get(blockIdx));
+                        }
+                    };
+                    longPressHandler.postDelayed(longPressRunnable, LONG_PRESS_MS);
+                }
+                return true;
+
+            case MotionEvent.ACTION_MOVE:
+                // Cancel long-press if finger moved significantly
+                if (longPressRunnable != null && blockIndexFromY(touchY) != longPressCandidateIdx) {
+                    longPressHandler.removeCallbacks(longPressRunnable);
+                    longPressRunnable = null;
+                }
+                return true;
+
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                longPressHandler.removeCallbacks(longPressRunnable != null ? longPressRunnable : () -> {});
+                longPressRunnable = null;
+                // Fire tap only if long-press did NOT fire and we're in a selection mode
+                if (!longPressFired && selectionMode != SelectionMode.NONE
+                        && blockIdx >= 0 && blockIdx < stack.size() && blockTapListener != null) {
+                    blockTapListener.onBlockTapped(blockIdx);
+                }
+                longPressFired = false;
+                return true;
         }
-        return true;
+        return super.onTouchEvent(event);
     }
 
     /** Convert a Y pixel coordinate to a stack block index (0 = top/highest address). */

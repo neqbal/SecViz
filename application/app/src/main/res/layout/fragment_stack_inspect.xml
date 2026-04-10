@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#161B22"
+    android:paddingTop="8dp"
+    android:paddingBottom="40dp"
+    android:paddingHorizontal="20dp">
+
+    <!-- Drag handle -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="#3D444D"/>
+
+    <!-- Title: slot label + address -->
+    <TextView
+        android:id="@+id/tv_slot_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#E6EDF3"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:fontFamily="monospace"
+        android:layout_marginBottom="4dp"/>
+
+    <TextView
+        android:id="@+id/tv_slot_address"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#8B949E"
+        android:textSize="12sp"
+        android:fontFamily="monospace"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Separator -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#21262D"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Value rows -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#0D1117"
+        android:padding="14dp">
+
+        <!-- Hex row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:text="HEX"
+                android:textColor="#58A6FF"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:textAllCaps="true"/>
+
+            <TextView
+                android:id="@+id/tv_val_hex"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#C9D1D9"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:textIsSelectable="true"/>
+        </LinearLayout>
+
+        <!-- Decimal row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:text="DEC"
+                android:textColor="#3FB950"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:textAllCaps="true"/>
+
+            <TextView
+                android:id="@+id/tv_val_dec"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#C9D1D9"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:textIsSelectable="true"/>
+        </LinearLayout>
+
+        <!-- String row (shown only when value is ASCII-decodable) -->
+        <LinearLayout
+            android:id="@+id/row_string"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:text="STR"
+                android:textColor="#D29922"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:textAllCaps="true"/>
+
+            <TextView
+                android:id="@+id/tv_val_str"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#C9D1D9"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:textIsSelectable="true"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Last instruction -->
+    <TextView
+        android:id="@+id/tv_last_instr_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="LAST INSTRUCTION"
+        android:textColor="#8B949E"
+        android:textSize="10sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.12"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="6dp"/>
+
+    <TextView
+        android:id="@+id/tv_last_instr"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#58A6FF"
+        android:textSize="13sp"
+        android:fontFamily="monospace"
+        android:background="#0D1117"
+        android:padding="12dp"
+        android:textIsSelectable="true"/>
+
+</LinearLayout>

@@ -39,7 +39,8 @@ import com.example.secviz.ui.dialogs.ObjdumpViewerFragment;
 import com.example.secviz.ui.dialogs.PayloadBuilderFragment;
 import com.example.secviz.ui.dialogs.RopEditorFragment;
 import com.example.secviz.ui.dialogs.RopScannerFragment;
-import com.example.secviz.ui.sheets.AssemblyBottomSheet;
+import com.example.secviz.ui.sheets.RegisterViewerSheet;
+import com.example.secviz.ui.sheets.StackInspectSheet;
 import com.example.secviz.ui.views.StackCanvasView;
 import com.example.secviz.viewmodel.LevelViewModel;
 import com.google.android.material.button.MaterialButton;
@@ -48,6 +49,7 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class LevelFragment extends Fragment {
 
@@ -75,7 +77,6 @@ public class LevelFragment extends Fragment {
     // Assembly tab UI references
     private RecyclerView rvAsm;
     private TextView tabSource, tabAssembly;
-    private LinearLayout registerPanel;
     private boolean isAsmTabActive = false;
     private int lastSnapshotCount = 0;
     private List<Pair<String, Boolean>> consoleItems = new ArrayList<>();
@@ -110,7 +111,6 @@ public class LevelFragment extends Fragment {
         layoutInput = root.findViewById(R.id.layout_input);
         etInput = root.findViewById(R.id.et_input);
         layoutPresets = root.findViewById(R.id.layout_presets);
-        registerPanel = root.findViewById(R.id.register_panel);
         btnNextStep = root.findViewById(R.id.btn_next_step);
         btnReset = root.findViewById(R.id.btn_reset);
         btnNextStage = root.findViewById(R.id.btn_next_stage);
@@ -121,7 +121,6 @@ public class LevelFragment extends Fragment {
         tabSource    = root.findViewById(R.id.tab_source);
         tabAssembly  = root.findViewById(R.id.tab_assembly);
         btnNextInstr = root.findViewById(R.id.btn_next_instr);
-        RecyclerView rvHexDump = root.findViewById(R.id.rv_hex_dump);
         MaterialButton btnHexClose  = root.findViewById(R.id.btn_hex_close);
 
         // Header
@@ -164,9 +163,11 @@ public class LevelFragment extends Fragment {
         rvConsole.setAdapter(consoleAdapter);
 
         // Hex dump RecyclerView (inside right drawer)
+        RecyclerView rvHexDump = root.findViewById(R.id.rv_hex_dump);
         hexDumpAdapter = new HexDumpAdapter();
         rvHexDump.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvHexDump.setAdapter(hexDumpAdapter);
+
 
         // Register timeline (horizontal strip)
         RecyclerView rvTimeline = root.findViewById(R.id.rv_register_timeline);
@@ -197,6 +198,12 @@ public class LevelFragment extends Fragment {
         // Stack canvas
         stackCanvas.setLevelId(level.id);
         stackCanvas.setStack(new ArrayList<>(level.initialStack));
+        // Long-press on any slot → show inspection sheet
+        stackCanvas.setBlockLongPressListener((idx, block) -> {
+            if (!isAdded()) return;
+            StackInspectSheet sheet = StackInspectSheet.newInstance(block);
+            sheet.show(getChildFragmentManager(), "stack_inspect");
+        });
 
         // Payload preset buttons
         for (String[] preset : level.payloadPresets) {
@@ -267,27 +274,9 @@ public class LevelFragment extends Fragment {
             if (btnNextInstr != null) btnNextInstr.setEnabled(!Boolean.TRUE.equals(waiting) && !done);
         });
 
-        // Live register panel
-        viewModel.simRegs.observe(getViewLifecycleOwner(), regs -> {
-            if (regs == null || registerPanel == null) return;
-            registerPanel.removeAllViews();
-            for (Map.Entry<String, String> e : regs.entrySet()) {
-                android.widget.TextView tv = new android.widget.TextView(requireContext());
-                String val = e.getValue();
-                // Keep it short: strip leading zeros from 0x000000000040046a → 0x40046a
-                if (val.startsWith("0x") && val.length() > 6) {
-                    String stripped = val.replaceFirst("0x0*", "0x");
-                    if (stripped.equals("0x")) stripped = "0x0";
-                    val = stripped;
-                }
-                tv.setText(e.getKey() + "=" + val);
-                tv.setTextSize(10f);
-                tv.setTextColor(0xFFB0BEC5);
-                tv.setTypeface(android.graphics.Typeface.MONOSPACE);
-                tv.setPadding(8, 0, 12, 0);
-                registerPanel.addView(tv);
-            }
-        });
+        // Register values auto-update simRegs LiveData — no inline panel needed
+        // (accessible via the Registers button → RegisterViewerSheet)
+
 
         // Assembly cursor observer
         viewModel.activeAsmInstrIdx.observe(getViewLifecycleOwner(), idx -> {
@@ -386,6 +375,7 @@ public class LevelFragment extends Fragment {
 
         btnReset.setOnClickListener(v -> viewModel.reset());
 
+
         btnNextStage.setOnClickListener(v -> {
             if (onNextLevel != null) onNextLevel.run();
         });
@@ -396,21 +386,20 @@ public class LevelFragment extends Fragment {
             return false;
         });
 
-        // Assembly sheet
+        // Registers button → open RegisterViewerSheet with current snapshot
         root.findViewById(R.id.btn_peek_assembly).setOnClickListener(v -> {
-            Integer lineIdx = viewModel.activeLineIndex.getValue();
-            if (lineIdx == null) return;
-            List<StackBlock> stk = viewModel.stack.getValue();
-            String rsp = (stk != null && viewModel.espIndex.getValue() != null
-                    && viewModel.espIndex.getValue() >= 0
-                    && stk.size() > viewModel.espIndex.getValue())
-                    ? stk.get(viewModel.espIndex.getValue()).value : "—";
-            String rbp = (stk != null && viewModel.ebpIndex.getValue() != null
-                    && viewModel.ebpIndex.getValue() >= 0
-                    && stk.size() > viewModel.ebpIndex.getValue())
-                    ? stk.get(viewModel.ebpIndex.getValue()).value : "—";
-            AssemblyBottomSheet.newInstance(level.code.get(lineIdx), rsp, rbp)
-                    .show(getChildFragmentManager(), "asm");
+            Map<String, String> regs = viewModel.simRegs.getValue();
+            if (regs == null || regs.isEmpty()) {
+                com.google.android.material.snackbar.Snackbar
+                        .make(snackbarAnchor, "No register data yet — step through the code first", 2000)
+                        .show();
+                return;
+            }
+            // Build a human-readable step label
+            Float stepVal = viewModel.step.getValue();
+            String stepLabel = stepVal != null ? "Step " + (int)(stepVal * 10) : "";
+            RegisterViewerSheet sheet = RegisterViewerSheet.newInstance(regs, stepLabel);
+            sheet.show(getChildFragmentManager(), "registers");
         });
 
 

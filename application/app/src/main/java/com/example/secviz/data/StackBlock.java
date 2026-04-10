@@ -15,6 +15,8 @@ public class StackBlock {
     public String value;
     public String type;
     public int size;
+    /** Last ASM instruction that wrote to or read from this slot. Null if never touched. */
+    public String lastInstruction;
 
     public StackBlock(String address, String label, String value, int size, String type) {
         this.address = address;
@@ -22,10 +24,13 @@ public class StackBlock {
         this.value = value;
         this.size = size;
         this.type = type;
+        this.lastInstruction = null;
     }
 
     // Deep-clone for immutable state updates
     public StackBlock copy() {
-        return new StackBlock(address, label, value, size, type);
+        StackBlock b = new StackBlock(address, label, value, size, type);
+        b.lastInstruction = lastInstruction;
+        return b;
     }
 }

@@ -21,6 +21,7 @@ import com.example.secviz.data.Level;
 import com.example.secviz.data.LevelsRepository;
 import com.example.secviz.ui.HomeFragment;
 import com.example.secviz.ui.LevelFragment;
+import com.example.secviz.ui.sheets.HintBottomSheet;
 import com.google.android.material.appbar.MaterialToolbar;
 
 import java.util.List;
@@ -35,6 +36,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean isOnHome = true;
 
     private MenuItem timerMenuItem;
+    private MenuItem hintMenuItem;
+    private String currentLevelHint = null;
     private android.os.Handler timerHandler;
     private Runnable timerRunnable;
     private long timerStartMs = 0;
@@ -97,6 +100,7 @@ public class MainActivity extends AppCompatActivity {
         invalidateOptionsMenu();
 
         Level level = levels.get(currentLevelIdx);
+        currentLevelHint = level.hint;
         if (drawerAdapter != null) drawerAdapter.notifyDataSetChanged();
 
         final int nextIdx = currentLevelIdx + 1;
@@ -135,18 +139,22 @@ public class MainActivity extends AppCompatActivity {
         timerView.setGravity(android.view.Gravity.CENTER_VERTICAL);
         timerView.setText("00:00");
 
+        hintMenuItem = menu.findItem(R.id.action_hint);
+
         return true;
     }
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
         // Show the home icon only when inside a level, not on the home screen
-        MenuItem homeItem = menu.findItem(R.id.action_home);
+        MenuItem homeItem  = menu.findItem(R.id.action_home);
         MenuItem timerItem = menu.findItem(R.id.action_timer);
-        if (homeItem != null) {
-            homeItem.setVisible(!isOnHome);
-        }
-        if (timerItem != null) timerItem.setVisible(!isOnHome);
+        MenuItem hintItem  = menu.findItem(R.id.action_hint);
+        boolean inLevel = !isOnHome;
+        if (homeItem  != null) homeItem.setVisible(inLevel);
+        if (timerItem != null) timerItem.setVisible(inLevel);
+        // Show hint only when the current level has a hint defined
+        if (hintItem  != null) hintItem.setVisible(inLevel && currentLevelHint != null && !currentLevelHint.isEmpty());
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -154,6 +162,13 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == R.id.action_home) {
             showHome();
+            return true;
+        }
+        if (item.getItemId() == R.id.action_hint) {
+            if (currentLevelHint != null && !currentLevelHint.isEmpty()) {
+                HintBottomSheet sheet = HintBottomSheet.newInstance(currentLevelHint);
+                sheet.show(getSupportFragmentManager(), "hint");
+            }
             return true;
         }
         return super.onOptionsItemSelected(item);

@@ -101,6 +101,9 @@ public class LevelViewModel extends ViewModel {
     private boolean execWaiting  = false; // local mirror of _waitingForInput
     private boolean isTerminal   = false; // program has ended
 
+    /** Address of the most recently *executed* instruction (used for JSON register override lookup). */
+    private String lastExecutedAddr = null;
+
     // ── Simulated register strings kept for ROP win-condition check ─────────
     private String rop_rax = "0x0000000000000000";
     private String rop_rdi = "0x0000000000000000";
@@ -140,9 +143,21 @@ public class LevelViewModel extends ViewModel {
     }
 
     private int findInitialEsp(Level lvl) {
+        // RSP on entry to main points at the return addr that _start's `call main` pushed.
+        // main's own `push rbp` writes the saved-RBP value ONE SLOT BELOW that.
+        // So: initialEsp = indexOf("main Saved EBP" or "main Saved RBP") - 1.
+        //   Level 1/2A: main Saved EBP at index 2 → initialEsp = 1
+        //   Level 2B:   main Saved RBP at index 0 → initialEsp = max(0,-1) = 0
         for (int i = 0; i < lvl.initialStack.size(); i++) {
             String lbl = lvl.initialStack.get(i).label;
-            if (lbl.contains("main Saved EBP") || lbl.contains("main Frame Data")) return i;
+            if (lbl.equals("main Saved EBP") || lbl.equals("main Saved RBP")) {
+                return Math.max(0, i - 1);
+            }
+        }
+        // Fallback: search by contains
+        for (int i = 0; i < lvl.initialStack.size(); i++) {
+            String lbl = lvl.initialStack.get(i).label;
+            if (lbl.contains("main Saved")) return Math.max(0, i - 1);
         }
         return 0;
     }
@@ -177,7 +192,7 @@ public class LevelViewModel extends ViewModel {
         ropHopCount   = 0;
         initSimGPR();  // reset register display state
         recordSnapshot("Program Ready", "main");
-        // Restore asm cursor to start line
+        lastExecutedAddr = null;
         pendingAsmIdx = -1;
         _activeAsmInstrIdx.setValue(-1);
         syncPendingToSourceLine(level.startCodeLine);
@@ -206,8 +221,9 @@ public class LevelViewModel extends ViewModel {
         if (pendingAsmIdx < 0 || pendingAsmIdx >= asmFlat.size()) return;
 
         AsmLine toExec = asmFlat.get(pendingAsmIdx);
+        lastExecutedAddr = toExec.address;          // record BEFORE dispatch
         int nextIdx = dispatchAndGetNext(toExec);
-        updateRegistersForInstr(toExec.rawText); // visual register update
+        updateRegistersForInstr(toExec.rawText);    // visual register update
 
         if (!execWaiting && !isTerminal) {
             nextIdx = skipToNextRealInstr(nextIdx);
@@ -241,6 +257,7 @@ public class LevelViewModel extends ViewModel {
             String mnemBeforeDispatch = extractMnem(
                     toExec.rawText.toLowerCase(java.util.Locale.US));
 
+            lastExecutedAddr = toExec.address;       // record BEFORE dispatch
             int nextIdx = dispatchAndGetNext(toExec);
             updateRegistersForInstr(toExec.rawText); // visual register update
             if (execWaiting || isTerminal) break;
@@ -293,8 +310,13 @@ public class LevelViewModel extends ViewModel {
                 if (raw.contains("rbp") || raw.contains("ebp")) simulatePushRbp();
                 break;
             case "mov":
-                if (raw.contains("rbp,rsp") || raw.contains("ebp,esp")) simulateMovRbpRsp();
+                if (raw.contains("rbp,rsp") || raw.contains("ebp,esp")) {
+                    simulateMovRbpRsp();
+                } else if (raw.contains("qword ptr [rbp-") || raw.contains("dword ptr [rbp-")) {
+                    simulateMovToStack(raw);
+                }
                 break;
+
             case "sub":
                 if (raw.contains("rsp,") || raw.contains("esp,")) simulateSubRsp(raw);
                 break;
@@ -391,14 +413,16 @@ public class LevelViewModel extends ViewModel {
         List<StackBlock> s = deepCopyStack(getStack());
         if (newEsp < s.size()) {
             StackBlock b = s.get(newEsp);
-            // Only write to a truly empty slot — leave all pre-populated frame slots untouched.
-            // This prevents main()'s push rbp from corrupting "main Ret Addr" (which already
-            // holds the correct return-to-libc value and is needed by the ROP chain).
+            // Only write to a truly empty/uninitialized slot.
+            // Accept: TYPE_NEUTRAL, explicit zeros ("0x0", "0x00000", etc.), "0x...", or empty.
+            // This prevents main()'s push rbp from clobbering pre-set return addresses.
+            boolean allZeroHex = b.value.matches("0[xX]0+");
             boolean isEmpty = b.type.equals(StackBlock.TYPE_NEUTRAL)
-                    || b.value.equals("0x0") || b.value.equals("0x...") || b.value.isEmpty();
+                    || allZeroHex || b.value.equals("0x...") || b.value.isEmpty();
             if (isEmpty) {
                 b.value = formatHex(parseRbpValue());
                 b.type  = StackBlock.TYPE_SAFE;
+                b.lastInstruction = currentAsmText();
                 _stack.setValue(s);
                 updateHexDump();
             }
@@ -426,7 +450,69 @@ public class LevelViewModel extends ViewModel {
         }
     }
 
+    /**
+     * Handles: mov QWORD PTR [rbp-N], rax/rdx/rcx/rsi/rdi/rbx
+     * Writes the source register's current display value into the matching stack slot.
+     * Used to show secret_key initialisation in Level 2A.
+     */
+    private void simulateMovToStack(String raw) {
+        // Extract the negative offset: [rbp-0x10] → 0x10
+        java.util.regex.Matcher offM =
+                java.util.regex.Pattern.compile("\\[rbp-0x([0-9a-fA-F]+)\\]").matcher(raw);
+        if (!offM.find()) return;
+
+        int byteOffset = Integer.parseInt(offM.group(1), 16);
+        // Each stack slot is 8 bytes; slots grow downward from RBP.
+        // Slot at [rbp-8] is directly below RBP (ebpIdx + 1 in our reversed array),
+        // [rbp-0x10] is one further (ebpIdx + 2), etc.
+        int slotOffset = byteOffset / 8; // 1-based distance below RBP
+        int slotIdx    = getEbpIdx() + slotOffset;
+
+        List<StackBlock> s = deepCopyStack(getStack());
+        if (slotIdx < 0 || slotIdx >= s.size()) return;
+        StackBlock slot = s.get(slotIdx);
+
+        // Determine source register's human-readable content
+        String value = null;
+        if      (raw.contains(",rax")) value = decodeMovAbsValue(simGPR.getOrDefault("rax", 0L));
+        else if (raw.contains(",rdx")) value = decodeMovAbsValue(simGPR.getOrDefault("rdx", 0L));
+        else if (raw.contains(",rcx")) value = decodeMovAbsValue(simGPR.getOrDefault("rcx", 0L));
+        else if (raw.contains(",rbx")) value = decodeMovAbsValue(simGPR.getOrDefault("rbx", 0L));
+        else if (raw.contains(",rsi")) value = decodeMovAbsValue(simGPR.getOrDefault("rsi", 0L));
+        else if (raw.contains(",rdi")) value = decodeMovAbsValue(simGPR.getOrDefault("rdi", 0L));
+        if (value == null) return; // unknown source — skip
+
+        slot.value = value;
+        slot.lastInstruction = currentAsmText();
+        // Keep TYPE_WARN for secret_key slots so they stay highlighted
+        if (!slot.type.equals(StackBlock.TYPE_WARN)) slot.type = StackBlock.TYPE_SAFE;
+        _stack.setValue(s);
+        updateHexDump();
+        _statusTitle.setValue("Stack ← \"" + value + "\"");
+        _statusDesc.setValue("Writing 8 bytes to [rbp-0x"
+                + Integer.toHexString(byteOffset) + "] = slot '" + slot.label + "'.");
+    }
+
+    /**
+     * Convert a long value loaded by movabs into a human-readable ASCII string.
+     * If all bytes are printable ASCII, returns the string; otherwise returns hex.
+     * Little-endian: low byte = first character.
+     */
+    private String decodeMovAbsValue(long val) {
+        StringBuilder sb = new StringBuilder(8);
+        boolean allPrintable = true;
+        for (int i = 0; i < 8; i++) {
+            int b = (int)((val >> (i * 8)) & 0xFF);
+            if (b == 0) { /* null terminator — stop */ break; }
+            if (b < 0x20 || b > 0x7e) { allPrintable = false; break; }
+            sb.append((char) b);
+        }
+        return allPrintable && sb.length() > 0 ? sb.toString()
+                : String.format("0x%x", val);
+    }
+
     private void simulateLeave() {
+
         // leave = mov rsp,rbp ; pop rbp
         int ebp = getEbpIdx();
         _espIndex.setValue(ebp);        // mov rsp, rbp
@@ -455,15 +541,21 @@ public class LevelViewModel extends ViewModel {
         Integer targetFlatIdx = addrToAsmIdx.get(retAddr);
 
         if (targetFlatIdx == null) {
-            // Corrupted / unknown address
+            // Corrupted / unknown address — check whether the slot looks intentionally smashed
             boolean corrupted = retBlock.type.equals(StackBlock.TYPE_DANGER)
                              || retBlock.type.equals(StackBlock.TYPE_JUNK)
                              || retBlock.type.equals(StackBlock.TYPE_TARGET)
                              || (!retVal.startsWith("0x") && !retVal.isEmpty());
             if (corrupted || !retVal.startsWith("0x")) {
+                // Show the corrupted value as RIP in register panel
+                rop_rip = retVal;
+                emitSimRegs();
                 _statusTitle.setValue("Segmentation Fault!");
                 _statusType.setValue("danger");
-                _statusDesc.setValue("RIP → " + retVal + " is not valid. SIGSEGV.");
+                _statusDesc.setValue("RIP → 0x" + retAddr + " (\"" + retVal + "\") is not a valid code address.\nSIGSEGV — process killed.");
+                addConsole("", false);
+                addConsole("Program received signal SIGSEGV, Segmentation fault.", false);
+                addConsole("RIP = 0x" + retAddr, false);
                 addConsole("[1]    killed  Segmentation fault", false);
                 if (level != null && "CRASH".equals(level.goal)) triggerWin(false);
                 _step.setValue(100f);
@@ -544,6 +636,7 @@ public class LevelViewModel extends ViewModel {
         if (newEsp < s.size()) {
             s.get(newEsp).value = retAddr;
             s.get(newEsp).type  = StackBlock.TYPE_SAFE;
+            s.get(newEsp).lastInstruction = currentAsmText();
         }
         _stack.setValue(s); updateHexDump();
         _espIndex.setValue(newEsp);
@@ -634,6 +727,12 @@ public class LevelViewModel extends ViewModel {
 
     private String formatHex(long val) { return String.format("0x%x", val); }
 
+    /** Returns the full raw text of the assembly instruction currently being dispatched. */
+    private String currentAsmText() {
+        if (asmFlat == null || pendingAsmIdx < 0 || pendingAsmIdx >= asmFlat.size()) return null;
+        return asmFlat.get(pendingAsmIdx).rawText.trim();
+    }
+
     private void syncPendingToSourceLine(int srcIdx) {
         String addr = srcLineToFirstAddr.get(srcIdx);
         if (addr == null) return;
@@ -706,7 +805,7 @@ public class LevelViewModel extends ViewModel {
 
     /** Push current simulated registers to LiveData for the auto-updating register panel. */
     private void emitSimRegs() {
-        // Update RIP in simGPR from the current pending instruction
+        // Update RIP in simGPR to the CURRENT pending (next-to-execute) instruction
         if (pendingAsmIdx >= 0 && pendingAsmIdx < asmFlat.size()) {
             try { simGPR.put("rip", Long.parseUnsignedLong(asmFlat.get(pendingAsmIdx).address, 16)); }
             catch (Exception ignored) {}
@@ -723,11 +822,13 @@ public class LevelViewModel extends ViewModel {
         m.put("RBP", fmtGPR("rbp"));
         m.put("RIP", fmtGPR("rip"));
 
-        // Apply per-instruction overrides if the current address has hardcoded values
-        if (pendingAsmIdx >= 0 && pendingAsmIdx < asmFlat.size()) {
-            String curAddr = asmFlat.get(pendingAsmIdx).address;
-            Map<String,String> overrides = instrRegOverrides.get(curAddr);
-            if (overrides != null) m.putAll(overrides); // overrides win over simGPR
+        // Apply per-instruction JSON overrides for the LAST EXECUTED instruction.
+        // The JSON maps: address → register state AFTER that instruction runs.
+        // We use lastExecutedAddr (not pendingAsmIdx) so values appear only AFTER
+        // the user has pressed ni/n and that instruction has been dispatched.
+        if (lastExecutedAddr != null) {
+            Map<String,String> overrides = instrRegOverrides.get(lastExecutedAddr.toLowerCase(java.util.Locale.US));
+            if (overrides != null) m.putAll(overrides);
         }
 
         _simRegs.setValue(m);
