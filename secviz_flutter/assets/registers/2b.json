@@ -1,0 +1,33 @@
+{
+  "_comment": "Level 2B — Control Flow Hijack. Stack top: 0x7fff8. win() at 0x400476.",
+
+  "40049e": { "RSP": "0x7fff8", "RBP": "0x7ffffc", "RIP": "0x40049e" },
+  "40049f": { "RSP": "0x7fff8", "RBP": "0x7fff8",  "RIP": "0x40049f" },
+  "4004a2": { "RSP": "0x7fff0", "RBP": "0x7fff8",  "RIP": "0x4004a2", "RAX": "0x0" },
+  "4004a7": { "RSP": "0x7ffe8", "RBP": "0x7fff8",  "RIP": "0x4004a7",
+              "_note": "call vuln — pushed ret addr 0x4004ac" },
+
+  "400487": { "RSP": "0x7ffe0", "RBP": "0x7fff8",  "RIP": "0x400487", "_note": "push rbp in vuln" },
+  "400488": { "RSP": "0x7ffe0", "RBP": "0x7ffe0",  "RIP": "0x400488" },
+  "40048b": { "RSP": "0x7ffc0", "RBP": "0x7ffe0",  "RIP": "0x40048b",
+              "_note": "sub rsp,0x20 = 32 bytes for buf[32]" },
+
+  "40048f": { "RSP": "0x7ffc0", "RBP": "0x7ffe0",  "RIP": "0x40048f",
+              "RAX": "0x7ffc0", "_note": "lea rax,[rbp-0x20] = buf" },
+  "400493": { "RSP": "0x7ffc0", "RBP": "0x7ffe0",  "RIP": "0x400493",
+              "RAX": "0x7ffc0", "RDI": "0x7ffc0" },
+  "400496": { "RSP": "0x7ffb8", "RBP": "0x7ffe0",  "RIP": "0x400496",
+              "RDI": "0x7ffc0", "_note": "call gets(buf)" },
+
+  "40049b": { "RSP": "0x7ffc0", "RBP": "0x7ffe0",  "RIP": "0x40049b", "_note": "nop" },
+  "40049c": { "RSP": "0x7ffe8", "RBP": "0x7ffe0",  "RIP": "0x40049c", "_note": "leave" },
+  "40049d": { "RSP": "0x7fff0", "RBP": "0x7ffe0",  "RIP": "0x40049d", "_note": "ret" },
+
+  "400476": { "RSP": "0x7ffef", "RBP": "0x7ffe0",  "RIP": "0x400476",
+              "_note": "win() — push rbp (RIP hijacked here!)" },
+  "400477": { "RSP": "0x7ffef", "RBP": "0x7ffef",  "RIP": "0x400477" },
+  "40047a": { "RSP": "0x7ffef", "RBP": "0x7ffef",  "RIP": "0x40047a",
+              "RDI": "0x4011b0", "_note": "mov edi, string addr for puts" },
+  "40047f": { "RSP": "0x7ffe7", "RBP": "0x7ffef",  "RIP": "0x40047f",
+              "_note": "call puts('SHELL OBTAINED...')" }
+}

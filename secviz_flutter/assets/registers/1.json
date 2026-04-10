@@ -1,0 +1,37 @@
+{
+  "_comment": "Register snapshots AFTER each instruction executes. Address = hex key (no 0x). Only include registers that changed or are meaningful at that point. Edit freely.",
+
+  "400487": { "RSP": "0x7fff4", "RBP": "0x7ffffc", "RIP": "0x400487" },
+  "400488": { "RSP": "0x7fff4", "RBP": "0x7fff4",  "RIP": "0x400488" },
+
+  "40048b": { "RSP": "0x7ffec", "RBP": "0x7fff4",  "RIP": "0x40048b",
+              "RAX": "0x0" },
+
+  "400466": { "RSP": "0x7ffe4", "RBP": "0x7fff4",  "RIP": "0x400466" },
+  "400467": { "RSP": "0x7ffe4", "RBP": "0x7ffe4",  "RIP": "0x400467" },
+  "40046a": { "RSP": "0x7ffd4", "RBP": "0x7ffe4",  "RIP": "0x40046a" },
+
+  "40046e": { "RSP": "0x7ffd4", "RBP": "0x7ffe4",  "RIP": "0x40046e",
+              "RAX": "0x7ffc4" },
+  "400472": { "RSP": "0x7ffd4", "RBP": "0x7ffe4",  "RIP": "0x400472",
+              "RAX": "0x7ffc4", "RDX": "0x64" },
+  "400477": { "RSP": "0x7ffd4", "RBP": "0x7ffe4",  "RIP": "0x400477",
+              "RAX": "0x7ffc4", "RSI": "0x7ffc4", "RDX": "0x64" },
+  "40047a": { "RSP": "0x7ffd4", "RBP": "0x7ffe4",  "RIP": "0x40047a",
+              "RAX": "0x7ffc4", "RSI": "0x7ffc4", "RDX": "0x64", "RDI": "0x1" },
+  "40047f": { "RSP": "0x7ffcc", "RBP": "0x7ffe4",  "RIP": "0x40047f",
+              "RAX": "0x7ffc4", "RSI": "0x7ffc4", "RDX": "0x64", "RDI": "0x1",
+              "_note": "call read(fd=1, buff, 100) — args set above" },
+
+  "400484": { "RSP": "0x7ffd4", "RBP": "0x7ffe4",  "RIP": "0x400484",
+              "_note": "nop — after read() returned" },
+  "400485": { "RSP": "0x7ffec", "RBP": "0x7ffe4",  "RIP": "0x400485",
+              "_note": "leave: rsp=rbp+8" },
+  "400486": { "RSP": "0x7fff4", "RBP": "0x7fff4",  "RIP": "0x400486",
+              "_note": "ret to main" },
+
+  "400490": { "RSP": "0x7fffc", "RBP": "0x7fff4",  "RIP": "0x400490",
+              "RAX": "0x0" },
+  "400495": { "RSP": "0x7ffffc","RBP": "0x7ffffc", "RIP": "0x400495",
+              "_note": "pop rbp; ret" }
+}

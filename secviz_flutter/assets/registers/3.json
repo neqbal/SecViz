@@ -1,0 +1,49 @@
+{
+  "_comment": "Level 3 — ROP Chain / NX bypass. Stack top: 0x7fff8. Gadgets at 0x40046a (pop rax), 0x40046f (pop rdi), 0x400474 (pop rsi), 0x400479 (pop rdx), 0x40047e (syscall). /bin/sh at 0x403010.",
+
+  "4004ab": { "RSP": "0x7fff8", "RBP": "0x7ffffc", "RIP": "0x4004ab", "_note": "main: push rbp" },
+  "4004ac": { "RSP": "0x7fff8", "RBP": "0x7fff8",  "RIP": "0x4004ac" },
+  "4004af": { "RSP": "0x7fff0", "RBP": "0x7fff8",  "RIP": "0x4004af", "RAX": "0x0" },
+  "4004b4": { "RSP": "0x7ffe8", "RBP": "0x7fff8",  "RIP": "0x4004b4",
+              "_note": "call vuln — pushed ret addr 0x4004b9" },
+
+  "400494": { "RSP": "0x7ffe0", "RBP": "0x7fff8",  "RIP": "0x400494", "_note": "vuln: push rbp" },
+  "400495": { "RSP": "0x7ffe0", "RBP": "0x7ffe0",  "RIP": "0x400495" },
+  "400498": { "RSP": "0x7ffc0", "RBP": "0x7ffe0",  "RIP": "0x400498",
+              "_note": "sub rsp,0x20 = buf[32]" },
+  "40049c": { "RSP": "0x7ffc0", "RBP": "0x7ffe0",  "RIP": "0x40049c",
+              "RAX": "0x7ffc0", "_note": "lea rax,[rbp-0x20] = buf" },
+  "4004a0": { "RSP": "0x7ffc0", "RBP": "0x7ffe0",  "RIP": "0x4004a0",
+              "RAX": "0x7ffc0", "RDI": "0x7ffc0" },
+  "4004a3": { "RSP": "0x7ffb8", "RBP": "0x7ffe0",  "RIP": "0x4004a3",
+              "RDI": "0x7ffc0", "_note": "call gets(buf) — enter ROP chain" },
+
+  "4004a8": { "RSP": "0x7ffc0", "RBP": "0x7ffe0",  "RIP": "0x4004a8", "_note": "nop" },
+  "4004a9": { "RSP": "0x7ffe8", "RBP": "0x7ffe0",  "RIP": "0x4004a9", "_note": "leave" },
+  "4004aa": { "RSP": "0x7fff0", "RBP": "0x7ffe0",  "RIP": "0x4004aa",
+              "_note": "ret — jumps to first ROP gadget" },
+
+  "40046a": { "RSP": "0x7fff0", "RBP": "0x7ffe0",  "RIP": "0x40046a",
+              "_note": "pop rax — pops 0x3b (execve syscall number)" },
+  "40046b": { "RSP": "0x7fff8", "RBP": "0x7ffe0",  "RIP": "0x40046b",
+              "RAX": "0x3b",    "_note": "ret to next gadget" },
+
+  "40046f": { "RSP": "0x7fff8", "RBP": "0x7ffe0",  "RIP": "0x40046f",
+              "RAX": "0x3b",    "_note": "pop rdi — pops /bin/sh addr" },
+  "400470": { "RSP": "0x80000", "RBP": "0x7ffe0",  "RIP": "0x400470",
+              "RAX": "0x3b", "RDI": "0x403010", "_note": "ret to next gadget" },
+
+  "400474": { "RSP": "0x80000", "RBP": "0x7ffe0",  "RIP": "0x400474",
+              "RAX": "0x3b", "RDI": "0x403010", "_note": "pop rsi — pops 0" },
+  "400475": { "RSP": "0x80008", "RBP": "0x7ffe0",  "RIP": "0x400475",
+              "RAX": "0x3b", "RDI": "0x403010", "RSI": "0x0", "_note": "ret" },
+
+  "400479": { "RSP": "0x80008", "RBP": "0x7ffe0",  "RIP": "0x400479",
+              "RAX": "0x3b", "RDI": "0x403010", "RSI": "0x0", "_note": "pop rdx — pops 0" },
+  "40047a": { "RSP": "0x80010", "RBP": "0x7ffe0",  "RIP": "0x40047a",
+              "RAX": "0x3b", "RDI": "0x403010", "RSI": "0x0", "RDX": "0x0", "_note": "ret" },
+
+  "40047e": { "RSP": "0x80010", "RBP": "0x7ffe0",  "RIP": "0x40047e",
+              "RAX": "0x3b", "RDI": "0x403010", "RSI": "0x0", "RDX": "0x0",
+              "_note": "syscall execve('/bin/sh', NULL, NULL) — SHELL!" }
+}
