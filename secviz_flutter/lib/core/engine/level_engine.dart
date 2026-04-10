@@ -360,10 +360,14 @@ class LevelEngine {
     );
 
     // Resume execution — advance to next instruction after call
-    _pendingAsmIdx = _skipToNextReal(_pendingAsmIdx + 1);
+    _pendingAsmIdx = _advancePastInputCall();
     _state = _state.copyWith(activeAsmInstrIdx: _pendingAsmIdx);
     _syncSourceToAsm();
     _emitSimRegs();
+    final nextAddr = (_pendingAsmIdx >= 0 && _pendingAsmIdx < _asmFlat.length)
+        ? _asmFlat[_pendingAsmIdx].address
+        : '?';
+    _addConsole('[DBG resume] pendingIdx=$_pendingAsmIdx addr=$nextAddr', false);
     _recordSnapshot(title, _pendingAsmIdx < _asmFlat.length ? _asmFlat[_pendingAsmIdx].address : '?');
     _state = _state.copyWith(isTerminal: false);
     _isTerminal = false;
@@ -396,10 +400,14 @@ class LevelEngine {
     );
     _updateHexDump();
     _execWaiting = false;
-    _pendingAsmIdx = _skipToNextReal(_pendingAsmIdx + 1);
+    _pendingAsmIdx = _advancePastInputCall();
     _state = _state.copyWith(activeAsmInstrIdx: _pendingAsmIdx);
     _syncSourceToAsm();
     _emitSimRegs();
+    final nextAddr = (_pendingAsmIdx >= 0 && _pendingAsmIdx < _asmFlat.length)
+        ? _asmFlat[_pendingAsmIdx].address
+        : '?';
+    _addConsole('[DBG payload] pendingIdx=$_pendingAsmIdx addr=$nextAddr', false);
     _recordSnapshot('Payload injected', _pendingAsmIdx < _asmFlat.length ? _asmFlat[_pendingAsmIdx].address : '?');
     _isTerminal = false;
   }
@@ -499,10 +507,14 @@ class LevelEngine {
     );
     _updateHexDump();
     _execWaiting = false;
-    _pendingAsmIdx = _skipToNextReal(_pendingAsmIdx + 1);
+    _pendingAsmIdx = _advancePastInputCall();
     _state = _state.copyWith(activeAsmInstrIdx: _pendingAsmIdx);
     _syncSourceToAsm();
     _emitSimRegs();
+    final nextAddr = (_pendingAsmIdx >= 0 && _pendingAsmIdx < _asmFlat.length)
+        ? _asmFlat[_pendingAsmIdx].address
+        : '?';
+    _addConsole('[DBG rop inject] pendingIdx=$_pendingAsmIdx addr=$nextAddr esp=$espIndex ebp=$ebpIndex', false);
     _recordSnapshot('ROP chain loaded', _pendingAsmIdx < _asmFlat.length ? _asmFlat[_pendingAsmIdx].address : '?');
     _isTerminal = false;
   }
@@ -555,6 +567,15 @@ class LevelEngine {
   int _dispatchAndGetNext(AsmLine instr) {
     final raw = instr.rawText.toLowerCase();
 
+    // Be tolerant of objdump formatting/parsing quirks.
+    // Some lines may fail mnemonic extraction even though they contain syscall.
+    if (raw.contains('syscall')) {
+      _addConsole('[DBG dispatch] syscall detected at ${instr.address}', false);
+      _simulateSyscall();
+      _isTerminal = true;
+      return _pendingAsmIdx;
+    }
+
     // CALL
     if (instr.callTarget != null || raw.contains('call ')) {
       return _handleCall(instr, raw);
@@ -583,9 +604,11 @@ class LevelEngine {
       case 'ret':
         return _simulateRet();
       case 'pop':
+        _addConsole("POP POP", false);
         _simulatePop(raw);
         break;
       case 'syscall':
+        _addConsole("SYSCALL SYSCALL", false);
         _simulateSyscall();
         _isTerminal = true;
         return _pendingAsmIdx;
@@ -860,10 +883,10 @@ class LevelEngine {
       );
       if (_ropPayload.isNotEmpty) {
         _ropHopCount++;
-        _addConsole('', false);
-        _addConsole('────────────────────────────[ Gadget #$_ropHopCount ]────────────────────────────', false);
-        _addConsole(' ►  ${_asmFlat[_pendingAsmIdx].address}    pop ${regName.toLowerCase()}', false);
-        _addConsole('   $regName ← $val', false);
+        //_addConsole('', false);
+        //_addConsole('────────────────────────────[ Gadget #$_ropHopCount ]────────────────────────────', false);
+        //_addConsole(' ►  ${_asmFlat[_pendingAsmIdx].address}    pop ${regName.toLowerCase()}', false);
+        //_addConsole('   $regName ← $val', false);
       }
     }
   }
@@ -1362,6 +1385,23 @@ class LevelEngine {
       from++;
     }
     return from;
+  }
+
+  int _advancePastInputCall() {
+    if (_asmFlat.isEmpty) return _skipToNextReal(0);
+    final cur = _pendingAsmIdx.clamp(0, _asmFlat.length - 1);
+    final start = (cur - 3).clamp(0, _asmFlat.length - 1);
+    final end = (cur + 3).clamp(0, _asmFlat.length - 1);
+    for (int i = start; i <= end; i++) {
+      final raw = _asmFlat[i].rawText.toLowerCase();
+      if (raw.contains('gets@plt') ||
+          raw.contains('<gets') ||
+          raw.contains('read@plt') ||
+          raw.contains('<read')) {
+        return _skipToNextReal(i + 1);
+      }
+    }
+    return _skipToNextReal(_pendingAsmIdx + 1);
   }
 
   int _safeStackMax() => _state.stack.isEmpty ? 0 : _state.stack.length - 1;
