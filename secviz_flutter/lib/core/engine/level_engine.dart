@@ -870,10 +870,23 @@ class LevelEngine {
     _state = _state.copyWith(espIndex: esp - 1);
 
     String regName = '';
-    if (raw.contains('rax')) { _ropRax = val; regName = 'RAX'; }
-    else if (raw.contains('rdi')) { _ropRdi = val; regName = 'RDI'; }
-    else if (raw.contains('rsi')) { _ropRsi = val; regName = 'RSI'; }
-    else if (raw.contains('rdx')) { _ropRdx = val; regName = 'RDX'; }
+    if (raw.contains('rax')) {
+      _ropRax = val;
+      _setGPR('rax', _parseRegLikeValue(val));
+      regName = 'RAX';
+    } else if (raw.contains('rdi')) {
+      _ropRdi = val;
+      _setGPR('rdi', _parseRegLikeValue(val));
+      regName = 'RDI';
+    } else if (raw.contains('rsi')) {
+      _ropRsi = val;
+      _setGPR('rsi', _parseRegLikeValue(val));
+      regName = 'RSI';
+    } else if (raw.contains('rdx')) {
+      _ropRdx = val;
+      _setGPR('rdx', _parseRegLikeValue(val));
+      regName = 'RDX';
+    }
 
     if (regName.isNotEmpty) {
       _state = _state.copyWith(
@@ -1416,6 +1429,28 @@ class LevelEngine {
     try {
       return int.parse(addr.replaceAll('0x', '').replaceAll('0X', ''), radix: 16);
     } catch (_) { return 0; }
+  }
+
+  int _parseRegLikeValue(String raw) {
+    final s = raw.trim().toLowerCase();
+    if (s.isEmpty) return 0;
+    if (s.contains('/bin/sh') || s.contains('binsh')) return 0x403010;
+
+    final hexMatch = RegExp(r'0x[0-9a-f]+').firstMatch(s);
+    if (hexMatch != null) {
+      return int.tryParse(hexMatch.group(0)!.substring(2), radix: 16) ?? 0;
+    }
+
+    final decMatch = RegExp(r'\b\d+\b').firstMatch(s);
+    if (decMatch != null) {
+      return int.tryParse(decMatch.group(0)!) ?? 0;
+    }
+
+    final bareHex = RegExp(r'\b[0-9a-f]+\b').firstMatch(s);
+    if (bareHex != null) {
+      return int.tryParse(bareHex.group(0)!, radix: 16) ?? 0;
+    }
+    return 0;
   }
 
   String _formatHex(int val) => '0x${val.toRadixString(16)}';
