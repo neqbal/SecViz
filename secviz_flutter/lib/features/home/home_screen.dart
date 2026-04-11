@@ -34,6 +34,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               pinned: true,
               backgroundColor: AppColors.bgSurface,
               surfaceTintColor: Colors.transparent,
+              actions: [
+                if (currentUser != null)
+                  IconButton(
+                    icon: const Icon(Icons.logout_rounded, color: AppColors.textPrimary),
+                    onPressed: () => ref.read(authControllerProvider.notifier).logout(),
+                    tooltip: 'Logout',
+                  ),
+              ],
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 68),
                 title: Column(
@@ -253,6 +261,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 onTap: () => Navigator.pop(ctx, 'review'),
               ),
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.format_list_bulleted_rounded,
+                    color: AppColors.success),
+                title: const Text(
+                  'See other reviews',
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                ),
+                onTap: () => Navigator.pop(ctx, 'see_reviews'),
+              ),
             ],
           ),
         );
@@ -265,6 +284,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     } else if (action == 'review') {
       await _showReviewDialog(
           userId: userId, levelId: levelId, levelTitle: levelTitle);
+    } else if (action == 'see_reviews') {
+      await _showOtherReviewsDialog(levelId: levelId, levelTitle: levelTitle);
     }
   }
 
@@ -454,6 +475,134 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     }
     controller.dispose();
+  }
+
+  Future<void> _showOtherReviewsDialog({
+    required String levelId,
+    required String levelTitle,
+  }) async {
+    final repo = ref.read(levelFeedbackRepositoryProvider);
+    final reviews = await repo.getReviewsForLevel(levelId);
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: AppColors.bgSurface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420, maxHeight: 500),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.format_list_bulleted_rounded,
+                          size: 16, color: AppColors.success),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'User Reviews',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20, color: AppColors.textMuted),
+                        onPressed: () => Navigator.pop(ctx),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    levelTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (reviews.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: Text(
+                          'No reviews yet. Be the first!',
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: reviews.length,
+                        separatorBuilder: (_, __) => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Divider(color: AppColors.border, height: 1),
+                        ),
+                        itemBuilder: (ctx, i) {
+                          final r = reviews[i];
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    r.username,
+                                    style: const TextStyle(
+                                      color: AppColors.accent,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (r.rating != null && r.rating! > 0)
+                                    Row(
+                                      children: List.generate(5, (starIdx) {
+                                        return Icon(
+                                          starIdx < r.rating!
+                                              ? Icons.star
+                                              : Icons.star_border,
+                                          size: 12,
+                                          color: AppColors.warning,
+                                        );
+                                      }),
+                                    )
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                r.review!,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 12,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

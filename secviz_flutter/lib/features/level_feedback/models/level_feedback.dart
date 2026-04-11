@@ -29,3 +29,38 @@ class LevelFeedback {
     );
   }
 }
+
+class LevelFeedbackWithUser {
+  final int id;
+  final int userId;
+  final String username;
+  final String levelId;
+  final int? rating;
+  final String? review;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const LevelFeedbackWithUser({
+    required this.id,
+    required this.userId,
+    required this.username,
+    required this.levelId,
+    required this.rating,
+    required this.review,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory LevelFeedbackWithUser.fromMap(Map<String, Object?> map) {
+    return LevelFeedbackWithUser(
+      id: map['id'] as int,
+      userId: map['user_id'] as int,
+      username: map['username'] as String,
+      levelId: map['level_id'] as String,
+      rating: map['rating'] as int?,
+      review: map['review'] as String?,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
+    );
+  }
+}

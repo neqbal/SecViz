@@ -66,4 +66,16 @@ class LevelFeedbackRepository {
       whereArgs: [existing.id],
     );
   }
+
+  Future<List<LevelFeedbackWithUser>> getReviewsForLevel(String levelId) async {
+    final db = await _database.database;
+    final rows = await db.rawQuery('''
+      SELECT f.*, u.username 
+      FROM level_feedback f
+      JOIN users u ON f.user_id = u.id
+      WHERE f.level_id = ? AND f.review IS NOT NULL AND f.review != ''
+      ORDER BY f.created_at DESC
+    ''', [levelId]);
+    return rows.map((r) => LevelFeedbackWithUser.fromMap(r)).toList();
+  }
 }
