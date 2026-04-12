@@ -132,11 +132,17 @@ class RegisterSnapshot {
   });
 }
 
+enum LevelType {
+  standard,
+  formatString,
+}
+
 class Level {
   final String id;
   final String title;
   final String subtitle;
-  final String goal; // CRASH | LEAK | CFH | ROP
+  final String goal; // CRASH | LEAK | CFH | ROP | FMT
+  final LevelType type;
   final String successTitle;
   final String successDesc;
   final int startCodeLine;
@@ -153,6 +159,7 @@ class Level {
     required this.title,
     required this.subtitle,
     required this.goal,
+    this.type = LevelType.standard,
     required this.successTitle,
     required this.successDesc,
     required this.startCodeLine,

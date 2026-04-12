@@ -9,7 +9,44 @@ class LevelsRepository {
     return _cache!;
   }
 
-  static List<Level> _buildLevels() => [_level1(), _level2a(), _level2b(), _level3()];
+  static List<Level> _buildLevels() => [_level1(), _level2a(), _level2b(), _level3(), _level4()];
+
+  // ── LEVEL 4: Format String Vulnerability ─────────────────────────────────────
+
+  static Level _level4() {
+    // Top of stack is empty format string buffer
+    // Further down the stack is a pointer.
+    final stack = [
+      StackBlock(address: '0x7fff8', label: 'padding', value: '0x00000', type: StackBlock.typeSafe),
+      StackBlock(address: '0x7fff0', label: 'Target Pointer', value: '0x404040', type: StackBlock.typeWarn, lastInstruction: 'Points to "flag{format_master}"'),
+      StackBlock(address: '0x7ffe8', label: 'padding', value: '0x00000', type: StackBlock.typeNeutral),
+      StackBlock(address: '0x7ffe0', label: 'fmt_buf[24..31]', value: '0x0', type: StackBlock.typeNeutral),
+      StackBlock(address: '0x7ffd8', label: 'fmt_buf[16..23]', value: '0x0', type: StackBlock.typeNeutral),
+      StackBlock(address: '0x7ffd0', label: 'fmt_buf[ 8..15]', value: '0x0', type: StackBlock.typeNeutral),
+      StackBlock(address: '0x7ffc8', label: 'fmt_buf[ 0.. 7]', value: '0x0', type: StackBlock.typeTarget),
+    ];
+
+    return Level(
+      id: '4',
+      title: 'Level 4: Format String',
+      subtitle: 'Leak memory and dereference pointers using printf.',
+      goal: 'FMT',
+      type: LevelType.formatString,
+      successTitle: 'Data Leaked!',
+      successDesc: 'You successfully discovered the offset and leaked the flag by using the %s specifier on a pointer located on the stack.',
+      startCodeLine: 0,
+      code: const [], // No code panel for this simplified standalone level
+      initialStack: stack,
+      payloadPresets: const [
+        ['Test Leak (%p)', '%p %p %p'],
+        ['Positional Access', '%7\$p'],
+        ['Dereference Pointer', '%11\$s']
+      ],
+      hint: '💡 Find the offset by entering consecutive %p. Once you spot the values from your input, you know the offset.\n'
+          'The first 6 arguments are mapped to registers. The 7th argument is the top of the stack (fmt_buf).\n'
+          'Use %[offset]\$s to dereference a pointer (like Target Pointer) as a string.',
+    );
+  }
 
   // ── LEVEL 1: The Crash ──────────────────────────────────────────────────────
 

@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../core/engine/levels_repository.dart';
+import '../../core/models/models.dart';
 import '../binary_exploitation/screens/level_screen.dart';
+import '../binary_exploitation/screens/format_string_screen.dart';
 import '../cryptography/screens/key_exchange_screen.dart';
 import '../cryptography/screens/hash_collision_screen.dart';
 import '../cryptography/screens/avalanche_screen.dart';
@@ -111,7 +113,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     icon: Icons.memory,
                     gradient: const [Color(0xFF1A0D0D), Color(0xFF2A0F0F)],
                     borderColor: AppColors.danger,
-                    badge: '4 Levels',
+                    badge: '\${levels.length} Levels',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const LevelScreen(levelId: '1')),
@@ -127,6 +129,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       title: l.title,
                       subtitle: l.subtitle,
                       goal: l.goal,
+                      type: l.type,
                       onLongPress: currentUser == null
                           ? null
                           : () => _showLevelFeedbackActions(
@@ -658,8 +661,13 @@ class _LevelSelectorSheet extends StatelessWidget {
                 color: AppColors.textMuted, size: 18),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => LevelScreen(levelId: l.id)));
+              if (l.type == LevelType.formatString) {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const FormatStringScreen()));
+              } else {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => LevelScreen(levelId: l.id)));
+              }
             },
           )),
         ],
@@ -812,6 +820,7 @@ class _LevelCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String goal;
+  final LevelType type;
   final VoidCallback? onLongPress;
 
   const _LevelCard({
@@ -819,6 +828,7 @@ class _LevelCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.goal,
+    required this.type,
     this.onLongPress,
   });
 
@@ -839,8 +849,15 @@ class _LevelCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => LevelScreen(levelId: levelId))),
+        onTap: () {
+          if (type == LevelType.formatString) {
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const FormatStringScreen()));
+          } else {
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => LevelScreen(levelId: levelId)));
+          }
+        },
         onLongPress: onLongPress,
         child: Container(
           padding: const EdgeInsets.all(14),
