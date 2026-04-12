@@ -7,6 +7,7 @@ import '../../core/engine/levels_repository.dart';
 import '../../core/models/models.dart';
 import '../binary_exploitation/screens/level_screen.dart';
 import '../binary_exploitation/screens/format_string_screen.dart';
+import '../binary_exploitation/screens/format_string2_screen.dart';
 import '../cryptography/screens/key_exchange_screen.dart';
 import '../cryptography/screens/hash_collision_screen.dart';
 import '../cryptography/screens/avalanche_screen.dart';
@@ -168,6 +169,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     color: AppColors.accent,
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const KeyExchangeScreen())),
+                    onLongPress: currentUser == null
+                        ? null
+                        : () => _showLevelFeedbackActions(
+                              levelId: 'crypto_key_exchange',
+                              levelTitle: 'Key Exchange Simulator',
+                              userId: currentUser.id,
+                            ),
                   ),
                   const SizedBox(height: 8),
                   _CryptoToolCard(
@@ -177,6 +185,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     color: AppColors.warning,
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const HashCollisionScreen())),
+                    onLongPress: currentUser == null
+                        ? null
+                        : () => _showLevelFeedbackActions(
+                              levelId: 'crypto_hash_collision',
+                              levelTitle: 'Hash Collision Challenge',
+                              userId: currentUser.id,
+                            ),
                   ),
                   const SizedBox(height: 8),
                   _CryptoToolCard(
@@ -186,6 +201,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     color: AppColors.purple,
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const AvalancheScreen())),
+                    onLongPress: currentUser == null
+                        ? null
+                        : () => _showLevelFeedbackActions(
+                              levelId: 'crypto_avalanche',
+                              levelTitle: 'Avalanche Effect Demo',
+                              userId: currentUser.id,
+                            ),
                   ),
                 ],
               ),
@@ -664,6 +686,9 @@ class _LevelSelectorSheet extends StatelessWidget {
               if (l.type == LevelType.formatString) {
                 Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const FormatStringScreen()));
+              } else if (l.type == LevelType.formatString2) {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const FormatString2Screen()));
               } else {
                 Navigator.push(context,
                     MaterialPageRoute(builder: (_) => LevelScreen(levelId: l.id)));
@@ -853,6 +878,9 @@ class _LevelCard extends StatelessWidget {
           if (type == LevelType.formatString) {
             Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const FormatStringScreen()));
+          } else if (type == LevelType.formatString2) {
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const FormatString2Screen()));
           } else {
             Navigator.push(context,
                 MaterialPageRoute(builder: (_) => LevelScreen(levelId: levelId)));
@@ -930,6 +958,7 @@ class _CryptoToolCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const _CryptoToolCard({
     required this.title,
@@ -937,6 +966,7 @@ class _CryptoToolCard extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -947,6 +977,7 @@ class _CryptoToolCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(

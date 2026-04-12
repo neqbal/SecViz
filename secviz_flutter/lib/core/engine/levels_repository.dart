@@ -9,7 +9,50 @@ class LevelsRepository {
     return _cache!;
   }
 
-  static List<Level> _buildLevels() => [_level1(), _level2a(), _level2b(), _level3(), _level4()];
+  static List<Level> _buildLevels() => [_level1(), _level2a(), _level2b(), _level3(), _level4(), _level5()];
+
+  // ── LEVEL 5: Format String — String Extraction ────────────────────────────────
+
+  static Level _level5() {
+    // The SECRET_KEY is placed at the 8th stack argument position.
+    // Args 1-6 = registers, arg 7 = fmt_buf top, arg 8-14 = further stack slots.
+    // So SECRET_KEY is placed as the 2nd stack slot after fmt_buf (index 5 in our list).
+    final stack = [
+      StackBlock(address: '0x7fff8', label: 'padding', value: '0x00000', type: StackBlock.typeSafe),
+      StackBlock(address: '0x7fff0', label: 'padding', value: '0x00000', type: StackBlock.typeSafe),
+      StackBlock(address: '0x7ffe8', label: 'SECRET_KEY ptr', value: '0x405050', type: StackBlock.typeWarn, lastInstruction: 'Points to "s3cr3t_k3y_9f2a"'),
+      StackBlock(address: '0x7ffe0', label: 'fmt_buf[24..31]', value: '0x0', type: StackBlock.typeNeutral),
+      StackBlock(address: '0x7ffd8', label: 'fmt_buf[16..23]', value: '0x0', type: StackBlock.typeNeutral),
+      StackBlock(address: '0x7ffd0', label: 'fmt_buf[ 8..15]', value: '0x0', type: StackBlock.typeNeutral),
+      StackBlock(address: '0x7ffc8', label: 'fmt_buf[ 0.. 7]', value: '0x0', type: StackBlock.typeTarget),
+    ];
+    // Stack layout: arg7=index6(fmt_buf[0..7]), arg8=index5(fmt_buf[8..15]),
+    //               arg9=index4(fmt_buf[16..23]), arg10=index3(fmt_buf[24..31]),
+    //               arg11=index2(SECRET_KEY ptr), arg12=index1(padding), arg13=index0(padding)
+    // The SECRET_KEY pointer is at arg 11. Use %11$s to dereference it.
+
+    return Level(
+      id: '5',
+      title: 'Level 5: String Extraction',
+      subtitle: 'Dereference a stack pointer to read a secret string.',
+      goal: 'FMT',
+      type: LevelType.formatString2,
+      successTitle: 'Secret Extracted!',
+      successDesc: 'You used %s to dereference a pointer on the stack and reveal the secret key.',
+      startCodeLine: 0,
+      code: const [],
+      initialStack: stack,
+      payloadPresets: const [
+        ['Leak Stack (%p x13)', '%p %p %p %p %p %p %p %p %p %p %p %p %p'],
+        ['Direct Access', '%11\$p'],
+        ['Hint: Deref Ptr', '%11\$s'],
+      ],
+      hint: '💡 Use %p repeatedly to scan stack values and find a pointer.\n'
+          'When you spot an address like 0x405050, try %<offset>\\\$s to dereference it as a string.\n'
+          'The 8th argument from printf is at a fixed position on the stack.',
+    );
+  }
+
 
   // ── LEVEL 4: Format String Vulnerability ─────────────────────────────────────
 

@@ -135,6 +135,7 @@ class RegisterSnapshot {
 enum LevelType {
   standard,
   formatString,
+  formatString2,
 }
 
 class Level {
